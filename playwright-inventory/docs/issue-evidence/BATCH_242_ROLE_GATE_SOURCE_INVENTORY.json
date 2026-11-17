@@ -1,0 +1,1701 @@
+{
+  "status": "SOURCE_INVENTORY_ONLY_NOT_AUTHORIZED",
+  "count": 214,
+  "direct_literal_cases": 159,
+  "unique_direct_role_literals": [
+    "PW_ADMIN_MANAGE_ALERTS",
+    "PW_ADMIN_NO_DIAGNOSTICS",
+    "PW_ADMIN_NO_STATUS",
+    "PW_ADMIN_OVERRIDE",
+    "PW_AS_VIEW_ONLY",
+    "PW_AUDIT_NO_DIAGNOSTICS",
+    "PW_AUDIT_NO_READ",
+    "PW_AUDIT_TECHNICAL",
+    "PW_COL_NO_INTELLIGENCE",
+    "PW_COL_NO_READ",
+    "PW_CROSS_GOVERNOR",
+    "PW_CROSS_GOVERNOR_NO_SOURCE_READ",
+    "PW_CROSS_GOVERNOR_SOURCE_READ_ONLY",
+    "PW_CROSS_READER",
+    "PW_DIAGNOSTICS",
+    "PW_DT_NO_ACTION",
+    "PW_DT_NO_INTELLIGENCE",
+    "PW_DT_NO_PRODUCTS",
+    "PW_EI_CATALOG_READ_ONLY",
+    "PW_EI_INVOICE_NO_MATCH",
+    "PW_EI_INVOICE_NO_PAY",
+    "PW_EI_LABEL_READ_ONLY",
+    "PW_EI_NOTIFY_READ_ONLY",
+    "PW_EI_NO_APPROVAL",
+    "PW_EI_NO_DISPATCH",
+    "PW_EI_NO_RECONCILE",
+    "PW_EI_NO_TASK",
+    "PW_ERQ_NO_INTELLIGENCE",
+    "PW_ERQ_NO_PRODUCTS",
+    "PW_ERQ_NO_VIEW",
+    "PW_ERQ_VIEW_ONLY",
+    "PW_ET_ASSIGNEE",
+    "PW_ET_READ_ONLY",
+    "PW_FORECAST_GOVERNOR",
+    "PW_FORECAST_READER",
+    "PW_GOVERNOR",
+    "PW_ICAP_CUSTOM_PRODUCT_ONLY",
+    "PW_ICAP_INTEGRATIONS_VIEW_ONLY",
+    "PW_ICAP_MOBILE_NO_ACTION",
+    "PW_ICAP_MOBILE_NO_SHIPMENTS",
+    "PW_ICAP_NO_ADJUST",
+    "PW_ICAP_NO_INTEGRATIONS",
+    "PW_ICAP_NO_STOCK",
+    "PW_ICAP_PRODUCTS_NO_SUPPLIERS",
+    "PW_ICAP_SCOPE_LIMITED",
+    "PW_INS_NO_PRODUCTS",
+    "PW_OUT_NO_ATTACHMENTS",
+    "PW_OUT_NO_CUSTOMER_RETURN",
+    "PW_OUT_NO_STOCK",
+    "PW_PO_READ_ONLY",
+    "PW_RC_ALL_SOURCE_READ",
+    "PW_RC_NO_ACTION",
+    "PW_RC_NO_INTELLIGENCE",
+    "PW_RC_NO_READ",
+    "PW_REPORTS_NO_INSIGHTS",
+    "PW_REQ_NO_APPROVE",
+    "PW_REQ_NO_FULFILL",
+    "PW_REQ_READ_ONLY",
+    "PW_RESTRICTED",
+    "PW_RPL_GOVERN_NO_PO",
+    "PW_RPL_READ_ONLY",
+    "PW_RSV_CANCEL_ANY",
+    "PW_RSV_CANCEL_OWN",
+    "PW_RSV_NO_ALLOCATE",
+    "PW_RSV_READ_ONLY",
+    "PW_SCAN_NO_RECEIVE",
+    "PW_SC_GOVERNOR",
+    "PW_SC_NO_ALERTS",
+    "PW_SC_NO_DIAGNOSTICS",
+    "PW_SC_NO_READ",
+    "PW_SC_NO_REVIEW",
+    "PW_SC_VIEW_ONLY",
+    "PW_SHP_NO_ITEMS",
+    "PW_SHP_OPERATIONS",
+    "PW_SHP_RECEIVE_ONLY",
+    "PW_SMV_LINKS_GRANTED",
+    "PW_SMV_NO_SHIPMENTS",
+    "PW_SMV_NO_TRANSFERS",
+    "PW_STOCK_ADJUSTER",
+    "PW_STOCK_NO_READ",
+    "PW_STOCK_READ_ONLY",
+    "PW_STORAGE_NO_STOCK",
+    "PW_STORAGE_READ_ONLY",
+    "PW_TRANSFER_READ_ONLY",
+    "PW_TSET_NO_READ",
+    "PW_TSET_READ_ONLY",
+    "PW_USAGE_READ_ONLY"
+  ],
+  "warning": "Literals are source hints, not proven effective permissions. Review helper defaults, roles, feature grants and the actual isolated tenant before executing. No new accounts or grants have been created.",
+  "cases": [
+    {
+      "id": "TADM-021",
+      "spec": "tenant/admin-system/admin-system-actions.spec.ts",
+      "explicit_role_literals": [
+        "PW_ADMIN_NO_DIAGNOSTICS"
+      ],
+      "needs_helper_and_permission_review": true
+    },
+    {
+      "id": "TADM-022",
+      "spec": "tenant/admin-system/admin-system-actions.spec.ts",
+      "explicit_role_literals": [
+        "PW_ADMIN_MANAGE_ALERTS"
+      ],
+      "needs_helper_and_permission_review": true
+    },
+    {
+      "id": "TADM-023",
+      "spec": "tenant/admin-system/admin-system-actions.spec.ts",
+      "explicit_role_literals": [
+        "PW_ADMIN_OVERRIDE"
+      ],
+      "needs_helper_and_permission_review": true
+    },
+    {
+      "id": "TADM-024",
+      "spec": "tenant/admin-system/admin-system-actions.spec.ts",
+      "explicit_role_literals": [
+        "PW_ADMIN_MANAGE_ALERTS"
+      ],
+      "needs_helper_and_permission_review": true
+    },
+    {
+      "id": "TADM-025",
+      "spec": "tenant/admin-system/admin-system-actions.spec.ts",
+      "explicit_role_literals": [
+        "PW_ADMIN_MANAGE_ALERTS"
+      ],
+      "needs_helper_and_permission_review": true
+    },
+    {
+      "id": "TADM-026",
+      "spec": "tenant/admin-system/admin-system-actions.spec.ts",
+      "explicit_role_literals": [
+        "PW_ADMIN_MANAGE_ALERTS"
+      ],
+      "needs_helper_and_permission_review": true
+    },
+    {
+      "id": "TADM-027",
+      "spec": "tenant/admin-system/admin-system-actions.spec.ts",
+      "explicit_role_literals": [
+        "PW_ADMIN_MANAGE_ALERTS"
+      ],
+      "needs_helper_and_permission_review": true
+    },
+    {
+      "id": "TADM-028",
+      "spec": "tenant/admin-system/admin-system-actions.spec.ts",
+      "explicit_role_literals": [
+        "PW_ADMIN_MANAGE_ALERTS"
+      ],
+      "needs_helper_and_permission_review": true
+    },
+    {
+      "id": "TADM-029",
+      "spec": "tenant/admin-system/admin-system-actions.spec.ts",
+      "explicit_role_literals": [
+        "PW_ADMIN_OVERRIDE"
+      ],
+      "needs_helper_and_permission_review": true
+    },
+    {
+      "id": "TADM-030",
+      "spec": "tenant/admin-system/admin-system-actions.spec.ts",
+      "explicit_role_literals": [
+        "PW_ADMIN_OVERRIDE"
+      ],
+      "needs_helper_and_permission_review": true
+    },
+    {
+      "id": "TADM-031",
+      "spec": "tenant/admin-system/admin-system-actions.spec.ts",
+      "explicit_role_literals": [
+        "PW_ADMIN_OVERRIDE"
+      ],
+      "needs_helper_and_permission_review": true
+    },
+    {
+      "id": "TADM-032",
+      "spec": "tenant/admin-system/admin-system-actions.spec.ts",
+      "explicit_role_literals": [
+        "PW_ADMIN_OVERRIDE"
+      ],
+      "needs_helper_and_permission_review": true
+    },
+    {
+      "id": "TADM-035",
+      "spec": "tenant/admin-system/admin-system-actions.spec.ts",
+      "explicit_role_literals": [
+        "PW_ADMIN_MANAGE_ALERTS"
+      ],
+      "needs_helper_and_permission_review": true
+    },
+    {
+      "id": "TADM-036",
+      "spec": "tenant/admin-system/admin-system-actions.spec.ts",
+      "explicit_role_literals": [
+        "PW_ADMIN_MANAGE_ALERTS"
+      ],
+      "needs_helper_and_permission_review": true
+    },
+    {
+      "id": "TADM-049",
+      "spec": "tenant/admin-system/admin-system-actions.spec.ts",
+      "explicit_role_literals": [
+        "PW_ADMIN_NO_STATUS"
+      ],
+      "needs_helper_and_permission_review": true
+    },
+    {
+      "id": "TADM-050",
+      "spec": "tenant/admin-system/admin-system-actions.spec.ts",
+      "explicit_role_literals": [
+        "PW_ADMIN_NO_DIAGNOSTICS"
+      ],
+      "needs_helper_and_permission_review": true
+    },
+    {
+      "id": "TAPE-013",
+      "spec": "tenant/adaptive-policy-engine/adaptive-policy-engine.spec.ts",
+      "explicit_role_literals": [
+        "PW_RESTRICTED"
+      ],
+      "needs_helper_and_permission_review": true
+    },
+    {
+      "id": "TAPE-014",
+      "spec": "tenant/adaptive-policy-engine/adaptive-policy-engine.spec.ts",
+      "explicit_role_literals": [
+        "PW_RESTRICTED"
+      ],
+      "needs_helper_and_permission_review": true
+    },
+    {
+      "id": "TAPE-015",
+      "spec": "tenant/adaptive-policy-engine/adaptive-policy-engine.spec.ts",
+      "explicit_role_literals": [
+        "PW_GOVERNOR"
+      ],
+      "needs_helper_and_permission_review": true
+    },
+    {
+      "id": "TAPE-017",
+      "spec": "tenant/adaptive-policy-engine/adaptive-policy-engine.spec.ts",
+      "explicit_role_literals": [
+        "PW_GOVERNOR"
+      ],
+      "needs_helper_and_permission_review": true
+    },
+    {
+      "id": "TAPE-018",
+      "spec": "tenant/adaptive-policy-engine/adaptive-policy-engine.spec.ts",
+      "explicit_role_literals": [
+        "PW_GOVERNOR"
+      ],
+      "needs_helper_and_permission_review": true
+    },
+    {
+      "id": "TAPE-019",
+      "spec": "tenant/adaptive-policy-engine/adaptive-policy-engine.spec.ts",
+      "explicit_role_literals": [
+        "PW_GOVERNOR"
+      ],
+      "needs_helper_and_permission_review": true
+    },
+    {
+      "id": "TAPE-020",
+      "spec": "tenant/adaptive-policy-engine/adaptive-policy-engine.spec.ts",
+      "explicit_role_literals": [
+        "PW_GOVERNOR"
+      ],
+      "needs_helper_and_permission_review": true
+    },
+    {
+      "id": "TAPE-024",
+      "spec": "tenant/adaptive-policy-engine/adaptive-policy-engine.spec.ts",
+      "explicit_role_literals": [],
+      "needs_helper_and_permission_review": true
+    },
+    {
+      "id": "TAPE-026",
+      "spec": "tenant/adaptive-policy-engine/adaptive-policy-engine.spec.ts",
+      "explicit_role_literals": [
+        "PW_GOVERNOR"
+      ],
+      "needs_helper_and_permission_review": true
+    },
+    {
+      "id": "TAPE-027",
+      "spec": "tenant/adaptive-policy-engine/adaptive-policy-engine.spec.ts",
+      "explicit_role_literals": [
+        "PW_GOVERNOR"
+      ],
+      "needs_helper_and_permission_review": true
+    },
+    {
+      "id": "TAPE-029",
+      "spec": "tenant/adaptive-policy-engine/adaptive-policy-engine.spec.ts",
+      "explicit_role_literals": [
+        "PW_RESTRICTED"
+      ],
+      "needs_helper_and_permission_review": true
+    },
+    {
+      "id": "TAPE-033",
+      "spec": "tenant/adaptive-policy-engine/adaptive-policy-engine.spec.ts",
+      "explicit_role_literals": [],
+      "needs_helper_and_permission_review": true
+    },
+    {
+      "id": "TAPE-034",
+      "spec": "tenant/adaptive-policy-engine/adaptive-policy-engine.spec.ts",
+      "explicit_role_literals": [],
+      "needs_helper_and_permission_review": true
+    },
+    {
+      "id": "TAPE-035",
+      "spec": "tenant/adaptive-policy-engine/adaptive-policy-engine.spec.ts",
+      "explicit_role_literals": [],
+      "needs_helper_and_permission_review": true
+    },
+    {
+      "id": "TAPE-036",
+      "spec": "tenant/adaptive-policy-engine/adaptive-policy-engine.spec.ts",
+      "explicit_role_literals": [],
+      "needs_helper_and_permission_review": true
+    },
+    {
+      "id": "TAPE-039",
+      "spec": "tenant/adaptive-policy-engine/adaptive-policy-engine.spec.ts",
+      "explicit_role_literals": [
+        "PW_GOVERNOR"
+      ],
+      "needs_helper_and_permission_review": true
+    },
+    {
+      "id": "TAPE-045",
+      "spec": "tenant/adaptive-policy-engine/adaptive-policy-engine.spec.ts",
+      "explicit_role_literals": [],
+      "needs_helper_and_permission_review": true
+    },
+    {
+      "id": "TAPE-049",
+      "spec": "tenant/adaptive-policy-engine/adaptive-policy-engine.spec.ts",
+      "explicit_role_literals": [
+        "PW_GOVERNOR"
+      ],
+      "needs_helper_and_permission_review": true
+    },
+    {
+      "id": "TAPE-050",
+      "spec": "tenant/adaptive-policy-engine/adaptive-policy-engine.spec.ts",
+      "explicit_role_literals": [
+        "PW_GOVERNOR"
+      ],
+      "needs_helper_and_permission_review": true
+    },
+    {
+      "id": "TAS-050",
+      "spec": "tenant/automation-schedules/automation-schedules.spec.ts",
+      "explicit_role_literals": [
+        "PW_AS_VIEW_ONLY"
+      ],
+      "needs_helper_and_permission_review": true
+    },
+    {
+      "id": "TAUD-025",
+      "spec": "tenant/tenant-audit/tenant-audit.spec.ts",
+      "explicit_role_literals": [
+        "PW_AUDIT_NO_DIAGNOSTICS"
+      ],
+      "needs_helper_and_permission_review": true
+    },
+    {
+      "id": "TAUD-026",
+      "spec": "tenant/tenant-audit/tenant-audit.spec.ts",
+      "explicit_role_literals": [
+        "PW_AUDIT_TECHNICAL"
+      ],
+      "needs_helper_and_permission_review": true
+    },
+    {
+      "id": "TAUD-027",
+      "spec": "tenant/tenant-audit/tenant-audit.spec.ts",
+      "explicit_role_literals": [
+        "PW_AUDIT_TECHNICAL"
+      ],
+      "needs_helper_and_permission_review": true
+    },
+    {
+      "id": "TAUD-028",
+      "spec": "tenant/tenant-audit/tenant-audit.spec.ts",
+      "explicit_role_literals": [
+        "PW_AUDIT_TECHNICAL"
+      ],
+      "needs_helper_and_permission_review": true
+    },
+    {
+      "id": "TAUD-040",
+      "spec": "tenant/tenant-audit/tenant-audit.spec.ts",
+      "explicit_role_literals": [
+        "PW_AUDIT_NO_READ"
+      ],
+      "needs_helper_and_permission_review": true
+    },
+    {
+      "id": "TAUD-041",
+      "spec": "tenant/tenant-audit/tenant-audit.spec.ts",
+      "explicit_role_literals": [
+        "PW_AUDIT_NO_DIAGNOSTICS"
+      ],
+      "needs_helper_and_permission_review": true
+    },
+    {
+      "id": "TAUD-044",
+      "spec": "tenant/tenant-audit/tenant-audit.spec.ts",
+      "explicit_role_literals": [
+        "PW_AUDIT_TECHNICAL"
+      ],
+      "needs_helper_and_permission_review": true
+    },
+    {
+      "id": "TAUD-068",
+      "spec": "tenant/tenant-audit/tenant-audit.spec.ts",
+      "explicit_role_literals": [
+        "PW_AUDIT_TECHNICAL"
+      ],
+      "needs_helper_and_permission_review": true
+    },
+    {
+      "id": "TCDO-002",
+      "spec": "tenant/cross-domain-optimization/cross-domain-optimization.spec.ts",
+      "explicit_role_literals": [
+        "PW_CROSS_READER"
+      ],
+      "needs_helper_and_permission_review": true
+    },
+    {
+      "id": "TCDO-003",
+      "spec": "tenant/cross-domain-optimization/cross-domain-optimization.spec.ts",
+      "explicit_role_literals": [
+        "PW_CROSS_GOVERNOR"
+      ],
+      "needs_helper_and_permission_review": true
+    },
+    {
+      "id": "TCDO-021",
+      "spec": "tenant/cross-domain-optimization/cross-domain-optimization.spec.ts",
+      "explicit_role_literals": [],
+      "needs_helper_and_permission_review": true
+    },
+    {
+      "id": "TCDO-022",
+      "spec": "tenant/cross-domain-optimization/cross-domain-optimization.spec.ts",
+      "explicit_role_literals": [],
+      "needs_helper_and_permission_review": true
+    },
+    {
+      "id": "TCDO-023",
+      "spec": "tenant/cross-domain-optimization/cross-domain-optimization.spec.ts",
+      "explicit_role_literals": [],
+      "needs_helper_and_permission_review": true
+    },
+    {
+      "id": "TCDO-024",
+      "spec": "tenant/cross-domain-optimization/cross-domain-optimization.spec.ts",
+      "explicit_role_literals": [
+        "PW_CROSS_GOVERNOR_NO_SOURCE_READ"
+      ],
+      "needs_helper_and_permission_review": true
+    },
+    {
+      "id": "TCDO-025",
+      "spec": "tenant/cross-domain-optimization/cross-domain-optimization.spec.ts",
+      "explicit_role_literals": [],
+      "needs_helper_and_permission_review": true
+    },
+    {
+      "id": "TCDO-026",
+      "spec": "tenant/cross-domain-optimization/cross-domain-optimization.spec.ts",
+      "explicit_role_literals": [],
+      "needs_helper_and_permission_review": true
+    },
+    {
+      "id": "TCDO-027",
+      "spec": "tenant/cross-domain-optimization/cross-domain-optimization.spec.ts",
+      "explicit_role_literals": [
+        "PW_CROSS_GOVERNOR_SOURCE_READ_ONLY"
+      ],
+      "needs_helper_and_permission_review": true
+    },
+    {
+      "id": "TCDO-028",
+      "spec": "tenant/cross-domain-optimization/cross-domain-optimization.spec.ts",
+      "explicit_role_literals": [],
+      "needs_helper_and_permission_review": true
+    },
+    {
+      "id": "TCDO-029",
+      "spec": "tenant/cross-domain-optimization/cross-domain-optimization.spec.ts",
+      "explicit_role_literals": [],
+      "needs_helper_and_permission_review": true
+    },
+    {
+      "id": "TCDO-030",
+      "spec": "tenant/cross-domain-optimization/cross-domain-optimization.spec.ts",
+      "explicit_role_literals": [],
+      "needs_helper_and_permission_review": true
+    },
+    {
+      "id": "TCDO-031",
+      "spec": "tenant/cross-domain-optimization/cross-domain-optimization.spec.ts",
+      "explicit_role_literals": [],
+      "needs_helper_and_permission_review": true
+    },
+    {
+      "id": "TCDO-032",
+      "spec": "tenant/cross-domain-optimization/cross-domain-optimization.spec.ts",
+      "explicit_role_literals": [],
+      "needs_helper_and_permission_review": true
+    },
+    {
+      "id": "TCDO-033",
+      "spec": "tenant/cross-domain-optimization/cross-domain-optimization.spec.ts",
+      "explicit_role_literals": [],
+      "needs_helper_and_permission_review": true
+    },
+    {
+      "id": "TCDO-034",
+      "spec": "tenant/cross-domain-optimization/cross-domain-optimization.spec.ts",
+      "explicit_role_literals": [],
+      "needs_helper_and_permission_review": true
+    },
+    {
+      "id": "TCDO-035",
+      "spec": "tenant/cross-domain-optimization/cross-domain-optimization.spec.ts",
+      "explicit_role_literals": [],
+      "needs_helper_and_permission_review": true
+    },
+    {
+      "id": "TCDO-036",
+      "spec": "tenant/cross-domain-optimization/cross-domain-optimization.spec.ts",
+      "explicit_role_literals": [],
+      "needs_helper_and_permission_review": true
+    },
+    {
+      "id": "TCDO-038",
+      "spec": "tenant/cross-domain-optimization/cross-domain-optimization.spec.ts",
+      "explicit_role_literals": [],
+      "needs_helper_and_permission_review": true
+    },
+    {
+      "id": "TCDO-039",
+      "spec": "tenant/cross-domain-optimization/cross-domain-optimization.spec.ts",
+      "explicit_role_literals": [],
+      "needs_helper_and_permission_review": true
+    },
+    {
+      "id": "TCDO-041",
+      "spec": "tenant/cross-domain-optimization/cross-domain-optimization.spec.ts",
+      "explicit_role_literals": [],
+      "needs_helper_and_permission_review": true
+    },
+    {
+      "id": "TCDO-044",
+      "spec": "tenant/cross-domain-optimization/cross-domain-optimization.spec.ts",
+      "explicit_role_literals": [],
+      "needs_helper_and_permission_review": true
+    },
+    {
+      "id": "TCDO-045",
+      "spec": "tenant/cross-domain-optimization/cross-domain-optimization.spec.ts",
+      "explicit_role_literals": [
+        "PW_CROSS_READER"
+      ],
+      "needs_helper_and_permission_review": true
+    },
+    {
+      "id": "TCDO-048",
+      "spec": "tenant/cross-domain-optimization/cross-domain-optimization.spec.ts",
+      "explicit_role_literals": [],
+      "needs_helper_and_permission_review": true
+    },
+    {
+      "id": "TCDO-049",
+      "spec": "tenant/cross-domain-optimization/cross-domain-optimization.spec.ts",
+      "explicit_role_literals": [],
+      "needs_helper_and_permission_review": true
+    },
+    {
+      "id": "TCDO-050",
+      "spec": "tenant/cross-domain-optimization/cross-domain-optimization.spec.ts",
+      "explicit_role_literals": [],
+      "needs_helper_and_permission_review": true
+    },
+    {
+      "id": "TCOL-047",
+      "spec": "tenant/collaboration/collaboration.spec.ts",
+      "explicit_role_literals": [
+        "PW_COL_NO_INTELLIGENCE"
+      ],
+      "needs_helper_and_permission_review": true
+    },
+    {
+      "id": "TCOL-050",
+      "spec": "tenant/collaboration/collaboration.spec.ts",
+      "explicit_role_literals": [
+        "PW_COL_NO_READ"
+      ],
+      "needs_helper_and_permission_review": true
+    },
+    {
+      "id": "TCOP-028",
+      "spec": "tenant/ai-copilot/ai-copilot.spec.ts",
+      "explicit_role_literals": [
+        "PW_RESTRICTED"
+      ],
+      "needs_helper_and_permission_review": true
+    },
+    {
+      "id": "TCOP-030",
+      "spec": "tenant/ai-copilot/ai-copilot.spec.ts",
+      "explicit_role_literals": [
+        "PW_RESTRICTED"
+      ],
+      "needs_helper_and_permission_review": true
+    },
+    {
+      "id": "TCOP-044",
+      "spec": "tenant/ai-copilot/ai-copilot.spec.ts",
+      "explicit_role_literals": [
+        "PW_RESTRICTED"
+      ],
+      "needs_helper_and_permission_review": true
+    },
+    {
+      "id": "TCOP-045",
+      "spec": "tenant/ai-copilot/ai-copilot.spec.ts",
+      "explicit_role_literals": [
+        "PW_GOVERNOR"
+      ],
+      "needs_helper_and_permission_review": true
+    },
+    {
+      "id": "TDLF-019",
+      "spec": "tenant/decision-learning-feedback/decision-learning-feedback.spec.ts",
+      "explicit_role_literals": [
+        "PW_GOVERNOR"
+      ],
+      "needs_helper_and_permission_review": true
+    },
+    {
+      "id": "TDLF-020",
+      "spec": "tenant/decision-learning-feedback/decision-learning-feedback.spec.ts",
+      "explicit_role_literals": [
+        "PW_GOVERNOR"
+      ],
+      "needs_helper_and_permission_review": true
+    },
+    {
+      "id": "TDLF-021",
+      "spec": "tenant/decision-learning-feedback/decision-learning-feedback.spec.ts",
+      "explicit_role_literals": [],
+      "needs_helper_and_permission_review": true
+    },
+    {
+      "id": "TDLF-023",
+      "spec": "tenant/decision-learning-feedback/decision-learning-feedback.spec.ts",
+      "explicit_role_literals": [
+        "PW_RESTRICTED"
+      ],
+      "needs_helper_and_permission_review": true
+    },
+    {
+      "id": "TDLF-024",
+      "spec": "tenant/decision-learning-feedback/decision-learning-feedback.spec.ts",
+      "explicit_role_literals": [],
+      "needs_helper_and_permission_review": true
+    },
+    {
+      "id": "TDLF-025",
+      "spec": "tenant/decision-learning-feedback/decision-learning-feedback.spec.ts",
+      "explicit_role_literals": [],
+      "needs_helper_and_permission_review": true
+    },
+    {
+      "id": "TDLF-027",
+      "spec": "tenant/decision-learning-feedback/decision-learning-feedback.spec.ts",
+      "explicit_role_literals": [],
+      "needs_helper_and_permission_review": true
+    },
+    {
+      "id": "TDLF-032",
+      "spec": "tenant/decision-learning-feedback/decision-learning-feedback.spec.ts",
+      "explicit_role_literals": [
+        "PW_RESTRICTED"
+      ],
+      "needs_helper_and_permission_review": true
+    },
+    {
+      "id": "TDLF-036",
+      "spec": "tenant/decision-learning-feedback/decision-learning-feedback.spec.ts",
+      "explicit_role_literals": [],
+      "needs_helper_and_permission_review": true
+    },
+    {
+      "id": "TDLF-038",
+      "spec": "tenant/decision-learning-feedback/decision-learning-feedback.spec.ts",
+      "explicit_role_literals": [],
+      "needs_helper_and_permission_review": true
+    },
+    {
+      "id": "TDLF-039",
+      "spec": "tenant/decision-learning-feedback/decision-learning-feedback.spec.ts",
+      "explicit_role_literals": [],
+      "needs_helper_and_permission_review": true
+    },
+    {
+      "id": "TDLF-041",
+      "spec": "tenant/decision-learning-feedback/decision-learning-feedback.spec.ts",
+      "explicit_role_literals": [
+        "PW_RESTRICTED"
+      ],
+      "needs_helper_and_permission_review": true
+    },
+    {
+      "id": "TDLF-042",
+      "spec": "tenant/decision-learning-feedback/decision-learning-feedback.spec.ts",
+      "explicit_role_literals": [],
+      "needs_helper_and_permission_review": true
+    },
+    {
+      "id": "TDLF-043",
+      "spec": "tenant/decision-learning-feedback/decision-learning-feedback.spec.ts",
+      "explicit_role_literals": [
+        "PW_RESTRICTED"
+      ],
+      "needs_helper_and_permission_review": true
+    },
+    {
+      "id": "TDLF-045",
+      "spec": "tenant/decision-learning-feedback/decision-learning-feedback.spec.ts",
+      "explicit_role_literals": [],
+      "needs_helper_and_permission_review": true
+    },
+    {
+      "id": "TDLF-049",
+      "spec": "tenant/decision-learning-feedback/decision-learning-feedback.spec.ts",
+      "explicit_role_literals": [],
+      "needs_helper_and_permission_review": true
+    },
+    {
+      "id": "TDLF-050",
+      "spec": "tenant/decision-learning-feedback/decision-learning-feedback.spec.ts",
+      "explicit_role_literals": [],
+      "needs_helper_and_permission_review": true
+    },
+    {
+      "id": "TDT-029",
+      "spec": "tenant/digital-twin/digital-twin.spec.ts",
+      "explicit_role_literals": [
+        "PW_DT_NO_PRODUCTS"
+      ],
+      "needs_helper_and_permission_review": true
+    },
+    {
+      "id": "TDT-048",
+      "spec": "tenant/digital-twin/digital-twin.spec.ts",
+      "explicit_role_literals": [
+        "PW_DT_NO_ACTION",
+        "PW_DT_NO_INTELLIGENCE"
+      ],
+      "needs_helper_and_permission_review": true
+    },
+    {
+      "id": "TEI-031",
+      "spec": "tenant/enterprise-inventory/enterprise-inventory-workflows.spec.ts",
+      "explicit_role_literals": [
+        "PW_EI_NO_TASK"
+      ],
+      "needs_helper_and_permission_review": true
+    },
+    {
+      "id": "TEI-039",
+      "spec": "tenant/enterprise-inventory/enterprise-inventory-workflows.spec.ts",
+      "explicit_role_literals": [
+        "PW_EI_NO_RECONCILE"
+      ],
+      "needs_helper_and_permission_review": true
+    },
+    {
+      "id": "TEI-047",
+      "spec": "tenant/enterprise-inventory/enterprise-inventory-workflows.spec.ts",
+      "explicit_role_literals": [
+        "PW_EI_NO_DISPATCH"
+      ],
+      "needs_helper_and_permission_review": true
+    },
+    {
+      "id": "TEI-057",
+      "spec": "tenant/enterprise-inventory/enterprise-inventory-workflows.spec.ts",
+      "explicit_role_literals": [
+        "PW_EI_NO_APPROVAL"
+      ],
+      "needs_helper_and_permission_review": true
+    },
+    {
+      "id": "TEI-063",
+      "spec": "tenant/enterprise-inventory/enterprise-inventory-workflows.spec.ts",
+      "explicit_role_literals": [
+        "PW_EI_CATALOG_READ_ONLY"
+      ],
+      "needs_helper_and_permission_review": true
+    },
+    {
+      "id": "TEI-067",
+      "spec": "tenant/enterprise-inventory/enterprise-inventory-workflows.spec.ts",
+      "explicit_role_literals": [
+        "PW_EI_INVOICE_NO_MATCH"
+      ],
+      "needs_helper_and_permission_review": true
+    },
+    {
+      "id": "TEI-068",
+      "spec": "tenant/enterprise-inventory/enterprise-inventory-workflows.spec.ts",
+      "explicit_role_literals": [
+        "PW_EI_INVOICE_NO_PAY"
+      ],
+      "needs_helper_and_permission_review": true
+    },
+    {
+      "id": "TEI-075",
+      "spec": "tenant/enterprise-inventory/enterprise-inventory-workflows.spec.ts",
+      "explicit_role_literals": [
+        "PW_EI_LABEL_READ_ONLY"
+      ],
+      "needs_helper_and_permission_review": true
+    },
+    {
+      "id": "TEI-084",
+      "spec": "tenant/enterprise-inventory/enterprise-inventory-workflows.spec.ts",
+      "explicit_role_literals": [
+        "PW_EI_NOTIFY_READ_ONLY"
+      ],
+      "needs_helper_and_permission_review": true
+    },
+    {
+      "id": "TET-043",
+      "spec": "tenant/execution-tasks/execution-tasks.spec.ts",
+      "explicit_role_literals": [
+        "PW_ET_ASSIGNEE"
+      ],
+      "needs_helper_and_permission_review": true
+    },
+    {
+      "id": "TET-050",
+      "spec": "tenant/execution-tasks/execution-tasks.spec.ts",
+      "explicit_role_literals": [
+        "PW_ET_READ_ONLY"
+      ],
+      "needs_helper_and_permission_review": true
+    },
+    {
+      "id": "TEXR-019",
+      "spec": "tenant/execution-requests/execution-requests.spec.ts",
+      "explicit_role_literals": [
+        "PW_ERQ_VIEW_ONLY"
+      ],
+      "needs_helper_and_permission_review": true
+    },
+    {
+      "id": "TEXR-027",
+      "spec": "tenant/execution-requests/execution-requests.spec.ts",
+      "explicit_role_literals": [],
+      "needs_helper_and_permission_review": true
+    },
+    {
+      "id": "TEXR-028",
+      "spec": "tenant/execution-requests/execution-requests.spec.ts",
+      "explicit_role_literals": [],
+      "needs_helper_and_permission_review": true
+    },
+    {
+      "id": "TEXR-029",
+      "spec": "tenant/execution-requests/execution-requests.spec.ts",
+      "explicit_role_literals": [],
+      "needs_helper_and_permission_review": true
+    },
+    {
+      "id": "TEXR-030",
+      "spec": "tenant/execution-requests/execution-requests.spec.ts",
+      "explicit_role_literals": [
+        "PW_ERQ_NO_INTELLIGENCE"
+      ],
+      "needs_helper_and_permission_review": true
+    },
+    {
+      "id": "TEXR-038",
+      "spec": "tenant/execution-requests/execution-requests.spec.ts",
+      "explicit_role_literals": [
+        "PW_ERQ_NO_PRODUCTS"
+      ],
+      "needs_helper_and_permission_review": true
+    },
+    {
+      "id": "TEXR-050",
+      "spec": "tenant/execution-requests/execution-requests.spec.ts",
+      "explicit_role_literals": [
+        "PW_ERQ_NO_VIEW"
+      ],
+      "needs_helper_and_permission_review": true
+    },
+    {
+      "id": "TICAP-042",
+      "spec": "tenant/inventory-capabilities/inventory-capabilities-workflows.spec.ts",
+      "explicit_role_literals": [
+        "PW_ICAP_INTEGRATIONS_VIEW_ONLY"
+      ],
+      "needs_helper_and_permission_review": true
+    },
+    {
+      "id": "TICAP-043",
+      "spec": "tenant/inventory-capabilities/inventory-capabilities-workflows.spec.ts",
+      "explicit_role_literals": [
+        "PW_ICAP_NO_INTEGRATIONS"
+      ],
+      "needs_helper_and_permission_review": true
+    },
+    {
+      "id": "TICAP-055",
+      "spec": "tenant/inventory-capabilities/inventory-capabilities-workflows.spec.ts",
+      "explicit_role_literals": [
+        "PW_ICAP_SCOPE_LIMITED"
+      ],
+      "needs_helper_and_permission_review": true
+    },
+    {
+      "id": "TICAP-069",
+      "spec": "tenant/inventory-capabilities/inventory-capabilities-workflows.spec.ts",
+      "explicit_role_literals": [
+        "PW_ICAP_NO_STOCK"
+      ],
+      "needs_helper_and_permission_review": true
+    },
+    {
+      "id": "TICAP-082",
+      "spec": "tenant/inventory-capabilities/inventory-capabilities-workflows.spec.ts",
+      "explicit_role_literals": [
+        "PW_ICAP_CUSTOM_PRODUCT_ONLY"
+      ],
+      "needs_helper_and_permission_review": true
+    },
+    {
+      "id": "TICAP-119",
+      "spec": "tenant/inventory-capabilities/inventory-capabilities-advanced.spec.ts",
+      "explicit_role_literals": [
+        "PW_ICAP_NO_STOCK"
+      ],
+      "needs_helper_and_permission_review": true
+    },
+    {
+      "id": "TICAP-128",
+      "spec": "tenant/inventory-capabilities/inventory-capabilities-advanced.spec.ts",
+      "explicit_role_literals": [
+        "PW_STORAGE_NO_STOCK"
+      ],
+      "needs_helper_and_permission_review": true
+    },
+    {
+      "id": "TICAP-141",
+      "spec": "tenant/inventory-capabilities/inventory-capabilities-advanced.spec.ts",
+      "explicit_role_literals": [
+        "PW_ICAP_MOBILE_NO_SHIPMENTS"
+      ],
+      "needs_helper_and_permission_review": true
+    },
+    {
+      "id": "TICAP-157",
+      "spec": "tenant/inventory-capabilities/inventory-capabilities-advanced.spec.ts",
+      "explicit_role_literals": [
+        "PW_ICAP_PRODUCTS_NO_SUPPLIERS"
+      ],
+      "needs_helper_and_permission_review": true
+    },
+    {
+      "id": "TICAP-161",
+      "spec": "tenant/inventory-capabilities/inventory-capabilities-advanced.spec.ts",
+      "explicit_role_literals": [
+        "PW_ICAP_MOBILE_NO_ACTION"
+      ],
+      "needs_helper_and_permission_review": true
+    },
+    {
+      "id": "TICAP-146",
+      "spec": "tenant/inventory-capabilities/inventory-capabilities.spec.ts",
+      "explicit_role_literals": [
+        "PW_ICAP_NO_ADJUST"
+      ],
+      "needs_helper_and_permission_review": true
+    },
+    {
+      "id": "TICAP-152",
+      "spec": "tenant/inventory-capabilities/inventory-capabilities.spec.ts",
+      "explicit_role_literals": [
+        "PW_ICAP_CUSTOM_PRODUCT_ONLY"
+      ],
+      "needs_helper_and_permission_review": true
+    },
+    {
+      "id": "TINS-044",
+      "spec": "tenant/insights/insights.spec.ts",
+      "explicit_role_literals": [
+        "PW_INS_NO_PRODUCTS"
+      ],
+      "needs_helper_and_permission_review": true
+    },
+    {
+      "id": "TINT-041",
+      "spec": "tenant/intelligence-review/intelligence-review.spec.ts",
+      "explicit_role_literals": [
+        "PW_RESTRICTED"
+      ],
+      "needs_helper_and_permission_review": true
+    },
+    {
+      "id": "TINT-042",
+      "spec": "tenant/intelligence-review/intelligence-review.spec.ts",
+      "explicit_role_literals": [
+        "PW_DIAGNOSTICS"
+      ],
+      "needs_helper_and_permission_review": true
+    },
+    {
+      "id": "TINT-045",
+      "spec": "tenant/intelligence-review/intelligence-review.spec.ts",
+      "explicit_role_literals": [],
+      "needs_helper_and_permission_review": true
+    },
+    {
+      "id": "TINT-046",
+      "spec": "tenant/intelligence-review/intelligence-review.spec.ts",
+      "explicit_role_literals": [],
+      "needs_helper_and_permission_review": true
+    },
+    {
+      "id": "TINT-047",
+      "spec": "tenant/intelligence-review/intelligence-review.spec.ts",
+      "explicit_role_literals": [],
+      "needs_helper_and_permission_review": true
+    },
+    {
+      "id": "TINT-048",
+      "spec": "tenant/intelligence-review/intelligence-review.spec.ts",
+      "explicit_role_literals": [],
+      "needs_helper_and_permission_review": true
+    },
+    {
+      "id": "TINT-049",
+      "spec": "tenant/intelligence-review/intelligence-review.spec.ts",
+      "explicit_role_literals": [],
+      "needs_helper_and_permission_review": true
+    },
+    {
+      "id": "TINT-050",
+      "spec": "tenant/intelligence-review/intelligence-review.spec.ts",
+      "explicit_role_literals": [],
+      "needs_helper_and_permission_review": true
+    },
+    {
+      "id": "TINT-051",
+      "spec": "tenant/intelligence-review/intelligence-review.spec.ts",
+      "explicit_role_literals": [],
+      "needs_helper_and_permission_review": true
+    },
+    {
+      "id": "TINT-052",
+      "spec": "tenant/intelligence-review/intelligence-review.spec.ts",
+      "explicit_role_literals": [
+        "PW_GOVERNOR"
+      ],
+      "needs_helper_and_permission_review": true
+    },
+    {
+      "id": "TINT-053",
+      "spec": "tenant/intelligence-review/intelligence-review.spec.ts",
+      "explicit_role_literals": [],
+      "needs_helper_and_permission_review": true
+    },
+    {
+      "id": "TINT-054",
+      "spec": "tenant/intelligence-review/intelligence-review.spec.ts",
+      "explicit_role_literals": [],
+      "needs_helper_and_permission_review": true
+    },
+    {
+      "id": "TINT-055",
+      "spec": "tenant/intelligence-review/intelligence-review.spec.ts",
+      "explicit_role_literals": [],
+      "needs_helper_and_permission_review": true
+    },
+    {
+      "id": "TINT-056",
+      "spec": "tenant/intelligence-review/intelligence-review.spec.ts",
+      "explicit_role_literals": [],
+      "needs_helper_and_permission_review": true
+    },
+    {
+      "id": "TINT-057",
+      "spec": "tenant/intelligence-review/intelligence-review.spec.ts",
+      "explicit_role_literals": [],
+      "needs_helper_and_permission_review": true
+    },
+    {
+      "id": "TINT-058",
+      "spec": "tenant/intelligence-review/intelligence-review.spec.ts",
+      "explicit_role_literals": [],
+      "needs_helper_and_permission_review": true
+    },
+    {
+      "id": "TINT-060",
+      "spec": "tenant/intelligence-review/intelligence-review.spec.ts",
+      "explicit_role_literals": [
+        "PW_RESTRICTED"
+      ],
+      "needs_helper_and_permission_review": true
+    },
+    {
+      "id": "TIR-020",
+      "spec": "tenant/inventory-requisitions/inventory-requisitions.spec.ts",
+      "explicit_role_literals": [],
+      "needs_helper_and_permission_review": true
+    },
+    {
+      "id": "TIR-044",
+      "spec": "tenant/inventory-requisitions/inventory-requisitions.spec.ts",
+      "explicit_role_literals": [
+        "PW_REQ_READ_ONLY"
+      ],
+      "needs_helper_and_permission_review": true
+    },
+    {
+      "id": "TIR-045",
+      "spec": "tenant/inventory-requisitions/inventory-requisitions.spec.ts",
+      "explicit_role_literals": [
+        "PW_REQ_NO_APPROVE"
+      ],
+      "needs_helper_and_permission_review": true
+    },
+    {
+      "id": "TIR-046",
+      "spec": "tenant/inventory-requisitions/inventory-requisitions.spec.ts",
+      "explicit_role_literals": [
+        "PW_REQ_NO_FULFILL"
+      ],
+      "needs_helper_and_permission_review": true
+    },
+    {
+      "id": "TIU-038",
+      "spec": "tenant/inventory-usage/inventory-usage.spec.ts",
+      "explicit_role_literals": [
+        "PW_USAGE_READ_ONLY"
+      ],
+      "needs_helper_and_permission_review": true
+    },
+    {
+      "id": "TIU-050",
+      "spec": "tenant/inventory-usage/inventory-usage.spec.ts",
+      "explicit_role_literals": [
+        "PW_USAGE_READ_ONLY"
+      ],
+      "needs_helper_and_permission_review": true
+    },
+    {
+      "id": "TOUT-025",
+      "spec": "tenant/outbound/outbound.spec.ts",
+      "explicit_role_literals": [
+        "PW_OUT_NO_STOCK"
+      ],
+      "needs_helper_and_permission_review": true
+    },
+    {
+      "id": "TOUT-031",
+      "spec": "tenant/outbound/outbound.spec.ts",
+      "explicit_role_literals": [
+        "PW_OUT_NO_STOCK"
+      ],
+      "needs_helper_and_permission_review": true
+    },
+    {
+      "id": "TOUT-041",
+      "spec": "tenant/outbound/outbound.spec.ts",
+      "explicit_role_literals": [
+        "PW_OUT_NO_ATTACHMENTS"
+      ],
+      "needs_helper_and_permission_review": true
+    },
+    {
+      "id": "TOUT-050",
+      "spec": "tenant/outbound/outbound.spec.ts",
+      "explicit_role_literals": [
+        "PW_OUT_NO_CUSTOMER_RETURN"
+      ],
+      "needs_helper_and_permission_review": true
+    },
+    {
+      "id": "TPF-005",
+      "spec": "tenant/probabilistic-forecasting/probabilistic-forecasting.spec.ts",
+      "explicit_role_literals": [
+        "PW_FORECAST_READER"
+      ],
+      "needs_helper_and_permission_review": true
+    },
+    {
+      "id": "TPF-006",
+      "spec": "tenant/probabilistic-forecasting/probabilistic-forecasting.spec.ts",
+      "explicit_role_literals": [
+        "PW_FORECAST_GOVERNOR"
+      ],
+      "needs_helper_and_permission_review": true
+    },
+    {
+      "id": "TPF-007",
+      "spec": "tenant/probabilistic-forecasting/probabilistic-forecasting.spec.ts",
+      "explicit_role_literals": [
+        "PW_FORECAST_GOVERNOR"
+      ],
+      "needs_helper_and_permission_review": true
+    },
+    {
+      "id": "TPF-032",
+      "spec": "tenant/probabilistic-forecasting/probabilistic-forecasting.spec.ts",
+      "explicit_role_literals": [
+        "PW_FORECAST_READER"
+      ],
+      "needs_helper_and_permission_review": true
+    },
+    {
+      "id": "TPF-046",
+      "spec": "tenant/probabilistic-forecasting/probabilistic-forecasting.spec.ts",
+      "explicit_role_literals": [
+        "PW_FORECAST_READER"
+      ],
+      "needs_helper_and_permission_review": true
+    },
+    {
+      "id": "TPF-048",
+      "spec": "tenant/probabilistic-forecasting/probabilistic-forecasting.spec.ts",
+      "explicit_role_literals": [
+        "PW_FORECAST_READER"
+      ],
+      "needs_helper_and_permission_review": true
+    },
+    {
+      "id": "TPF-049",
+      "spec": "tenant/probabilistic-forecasting/probabilistic-forecasting.spec.ts",
+      "explicit_role_literals": [
+        "PW_FORECAST_READER"
+      ],
+      "needs_helper_and_permission_review": true
+    },
+    {
+      "id": "TPO-049",
+      "spec": "tenant/purchase-orders/purchase-orders-batch28.spec.ts",
+      "explicit_role_literals": [
+        "PW_PO_READ_ONLY"
+      ],
+      "needs_helper_and_permission_review": true
+    },
+    {
+      "id": "TRC-027",
+      "spec": "tenant/reliability-command/reliability-command.spec.ts",
+      "explicit_role_literals": [
+        "PW_RC_ALL_SOURCE_READ"
+      ],
+      "needs_helper_and_permission_review": true
+    },
+    {
+      "id": "TRC-029",
+      "spec": "tenant/reliability-command/reliability-command.spec.ts",
+      "explicit_role_literals": [
+        "PW_RC_ALL_SOURCE_READ"
+      ],
+      "needs_helper_and_permission_review": true
+    },
+    {
+      "id": "TRC-030",
+      "spec": "tenant/reliability-command/reliability-command.spec.ts",
+      "explicit_role_literals": [
+        "PW_RC_NO_INTELLIGENCE"
+      ],
+      "needs_helper_and_permission_review": true
+    },
+    {
+      "id": "TRC-031",
+      "spec": "tenant/reliability-command/reliability-command.spec.ts",
+      "explicit_role_literals": [
+        "PW_RC_NO_ACTION"
+      ],
+      "needs_helper_and_permission_review": true
+    },
+    {
+      "id": "TRC-032",
+      "spec": "tenant/reliability-command/reliability-command.spec.ts",
+      "explicit_role_literals": [
+        "PW_RC_NO_ACTION"
+      ],
+      "needs_helper_and_permission_review": true
+    },
+    {
+      "id": "TRC-045",
+      "spec": "tenant/reliability-command/reliability-command.spec.ts",
+      "explicit_role_literals": [
+        "PW_RC_NO_READ"
+      ],
+      "needs_helper_and_permission_review": true
+    },
+    {
+      "id": "TRC-050",
+      "spec": "tenant/reliability-command/reliability-command.spec.ts",
+      "explicit_role_literals": [
+        "PW_RC_ALL_SOURCE_READ"
+      ],
+      "needs_helper_and_permission_review": true
+    },
+    {
+      "id": "TRC-080",
+      "spec": "tenant/reliability-command/reliability-command.spec.ts",
+      "explicit_role_literals": [
+        "PW_RC_ALL_SOURCE_READ"
+      ],
+      "needs_helper_and_permission_review": true
+    },
+    {
+      "id": "TRPL-036",
+      "spec": "tenant/replenishment-planning/replenishment-planning.spec.ts",
+      "explicit_role_literals": [
+        "PW_RPL_GOVERN_NO_PO"
+      ],
+      "needs_helper_and_permission_review": true
+    },
+    {
+      "id": "TRPL-049",
+      "spec": "tenant/replenishment-planning/replenishment-planning.spec.ts",
+      "explicit_role_literals": [
+        "PW_RPL_READ_ONLY"
+      ],
+      "needs_helper_and_permission_review": true
+    },
+    {
+      "id": "TRPT-022",
+      "spec": "tenant/reports/reports.spec.ts",
+      "explicit_role_literals": [
+        "PW_REPORTS_NO_INSIGHTS"
+      ],
+      "needs_helper_and_permission_review": true
+    },
+    {
+      "id": "TRSV-045",
+      "spec": "tenant/inventory-reservations/inventory-reservations.spec.ts",
+      "explicit_role_literals": [
+        "PW_RSV_READ_ONLY"
+      ],
+      "needs_helper_and_permission_review": true
+    },
+    {
+      "id": "TRSV-046",
+      "spec": "tenant/inventory-reservations/inventory-reservations.spec.ts",
+      "explicit_role_literals": [
+        "PW_RSV_NO_ALLOCATE"
+      ],
+      "needs_helper_and_permission_review": true
+    },
+    {
+      "id": "TRSV-047",
+      "spec": "tenant/inventory-reservations/inventory-reservations.spec.ts",
+      "explicit_role_literals": [
+        "PW_RSV_CANCEL_ANY",
+        "PW_RSV_CANCEL_OWN"
+      ],
+      "needs_helper_and_permission_review": true
+    },
+    {
+      "id": "TSC-027",
+      "spec": "tenant/system-context/system-context.spec.ts",
+      "explicit_role_literals": [
+        "PW_SC_GOVERNOR"
+      ],
+      "needs_helper_and_permission_review": true
+    },
+    {
+      "id": "TSC-028",
+      "spec": "tenant/system-context/system-context.spec.ts",
+      "explicit_role_literals": [
+        "PW_SC_GOVERNOR"
+      ],
+      "needs_helper_and_permission_review": true
+    },
+    {
+      "id": "TSC-029",
+      "spec": "tenant/system-context/system-context.spec.ts",
+      "explicit_role_literals": [
+        "PW_SC_GOVERNOR"
+      ],
+      "needs_helper_and_permission_review": true
+    },
+    {
+      "id": "TSC-030",
+      "spec": "tenant/system-context/system-context.spec.ts",
+      "explicit_role_literals": [
+        "PW_SC_GOVERNOR"
+      ],
+      "needs_helper_and_permission_review": true
+    },
+    {
+      "id": "TSC-031",
+      "spec": "tenant/system-context/system-context.spec.ts",
+      "explicit_role_literals": [
+        "PW_SC_VIEW_ONLY"
+      ],
+      "needs_helper_and_permission_review": true
+    },
+    {
+      "id": "TSC-032",
+      "spec": "tenant/system-context/system-context.spec.ts",
+      "explicit_role_literals": [
+        "PW_SC_GOVERNOR"
+      ],
+      "needs_helper_and_permission_review": true
+    },
+    {
+      "id": "TSC-033",
+      "spec": "tenant/system-context/system-context.spec.ts",
+      "explicit_role_literals": [
+        "PW_SC_GOVERNOR"
+      ],
+      "needs_helper_and_permission_review": true
+    },
+    {
+      "id": "TSC-034",
+      "spec": "tenant/system-context/system-context.spec.ts",
+      "explicit_role_literals": [
+        "PW_SC_NO_DIAGNOSTICS"
+      ],
+      "needs_helper_and_permission_review": true
+    },
+    {
+      "id": "TSC-035",
+      "spec": "tenant/system-context/system-context.spec.ts",
+      "explicit_role_literals": [
+        "PW_SC_NO_REVIEW"
+      ],
+      "needs_helper_and_permission_review": true
+    },
+    {
+      "id": "TSC-036",
+      "spec": "tenant/system-context/system-context.spec.ts",
+      "explicit_role_literals": [
+        "PW_SC_GOVERNOR"
+      ],
+      "needs_helper_and_permission_review": true
+    },
+    {
+      "id": "TSC-038",
+      "spec": "tenant/system-context/system-context.spec.ts",
+      "explicit_role_literals": [
+        "PW_SC_GOVERNOR"
+      ],
+      "needs_helper_and_permission_review": true
+    },
+    {
+      "id": "TSC-039",
+      "spec": "tenant/system-context/system-context.spec.ts",
+      "explicit_role_literals": [
+        "PW_SC_NO_DIAGNOSTICS"
+      ],
+      "needs_helper_and_permission_review": true
+    },
+    {
+      "id": "TSC-040",
+      "spec": "tenant/system-context/system-context.spec.ts",
+      "explicit_role_literals": [
+        "PW_SC_GOVERNOR"
+      ],
+      "needs_helper_and_permission_review": true
+    },
+    {
+      "id": "TSC-041",
+      "spec": "tenant/system-context/system-context.spec.ts",
+      "explicit_role_literals": [
+        "PW_SC_GOVERNOR"
+      ],
+      "needs_helper_and_permission_review": true
+    },
+    {
+      "id": "TSC-042",
+      "spec": "tenant/system-context/system-context.spec.ts",
+      "explicit_role_literals": [
+        "PW_SC_GOVERNOR"
+      ],
+      "needs_helper_and_permission_review": true
+    },
+    {
+      "id": "TSC-043",
+      "spec": "tenant/system-context/system-context.spec.ts",
+      "explicit_role_literals": [
+        "PW_SC_GOVERNOR"
+      ],
+      "needs_helper_and_permission_review": true
+    },
+    {
+      "id": "TSC-049",
+      "spec": "tenant/system-context/system-context.spec.ts",
+      "explicit_role_literals": [
+        "PW_SC_NO_ALERTS"
+      ],
+      "needs_helper_and_permission_review": true
+    },
+    {
+      "id": "TSC-050",
+      "spec": "tenant/system-context/system-context.spec.ts",
+      "explicit_role_literals": [
+        "PW_SC_NO_READ"
+      ],
+      "needs_helper_and_permission_review": true
+    },
+    {
+      "id": "TSET-018",
+      "spec": "tenant/tenant-settings/tenant-settings.spec.ts",
+      "explicit_role_literals": [
+        "PW_TSET_READ_ONLY"
+      ],
+      "needs_helper_and_permission_review": true
+    },
+    {
+      "id": "TSET-043",
+      "spec": "tenant/tenant-settings/tenant-settings.spec.ts",
+      "explicit_role_literals": [
+        "PW_TSET_NO_READ"
+      ],
+      "needs_helper_and_permission_review": true
+    },
+    {
+      "id": "TSH-043",
+      "spec": "tenant/shipments/shipments.spec.ts",
+      "explicit_role_literals": [
+        "PW_SHP_OPERATIONS"
+      ],
+      "needs_helper_and_permission_review": true
+    },
+    {
+      "id": "TSH-044",
+      "spec": "tenant/shipments/shipments.spec.ts",
+      "explicit_role_literals": [
+        "PW_SHP_RECEIVE_ONLY"
+      ],
+      "needs_helper_and_permission_review": true
+    },
+    {
+      "id": "TSH-049",
+      "spec": "tenant/shipments/shipments.spec.ts",
+      "explicit_role_literals": [
+        "PW_SHP_NO_ITEMS"
+      ],
+      "needs_helper_and_permission_review": true
+    },
+    {
+      "id": "TSL-031",
+      "spec": "tenant/storage-locations/storage-locations.spec.ts",
+      "explicit_role_literals": [
+        "PW_STORAGE_READ_ONLY"
+      ],
+      "needs_helper_and_permission_review": true
+    },
+    {
+      "id": "TSL-032",
+      "spec": "tenant/storage-locations/storage-locations.spec.ts",
+      "explicit_role_literals": [
+        "PW_STORAGE_READ_ONLY"
+      ],
+      "needs_helper_and_permission_review": true
+    },
+    {
+      "id": "TSL-037",
+      "spec": "tenant/storage-locations/storage-locations.spec.ts",
+      "explicit_role_literals": [
+        "PW_STORAGE_NO_STOCK"
+      ],
+      "needs_helper_and_permission_review": true
+    },
+    {
+      "id": "TSMV-041",
+      "spec": "tenant/stock-movements/stock-movements.spec.ts",
+      "explicit_role_literals": [
+        "PW_SMV_LINKS_GRANTED"
+      ],
+      "needs_helper_and_permission_review": true
+    },
+    {
+      "id": "TSMV-042",
+      "spec": "tenant/stock-movements/stock-movements.spec.ts",
+      "explicit_role_literals": [
+        "PW_SMV_NO_SHIPMENTS"
+      ],
+      "needs_helper_and_permission_review": true
+    },
+    {
+      "id": "TSMV-043",
+      "spec": "tenant/stock-movements/stock-movements.spec.ts",
+      "explicit_role_literals": [
+        "PW_SMV_LINKS_GRANTED"
+      ],
+      "needs_helper_and_permission_review": true
+    },
+    {
+      "id": "TSMV-044",
+      "spec": "tenant/stock-movements/stock-movements.spec.ts",
+      "explicit_role_literals": [
+        "PW_SMV_NO_TRANSFERS"
+      ],
+      "needs_helper_and_permission_review": true
+    },
+    {
+      "id": "TSMV-070",
+      "spec": "tenant/stock-movements/stock-movements.spec.ts",
+      "explicit_role_literals": [
+        "PW_SMV_NO_SHIPMENTS"
+      ],
+      "needs_helper_and_permission_review": true
+    },
+    {
+      "id": "TSMV-078",
+      "spec": "tenant/stock-movements/stock-movements.spec.ts",
+      "explicit_role_literals": [
+        "PW_SMV_LINKS_GRANTED"
+      ],
+      "needs_helper_and_permission_review": true
+    },
+    {
+      "id": "TSN-050",
+      "spec": "tenant/scanner/scanner-batch32.spec.ts",
+      "explicit_role_literals": [
+        "PW_SCAN_NO_RECEIVE"
+      ],
+      "needs_helper_and_permission_review": true
+    },
+    {
+      "id": "TST-026",
+      "spec": "tenant/stock/stock.spec.ts",
+      "explicit_role_literals": [
+        "PW_STOCK_ADJUSTER"
+      ],
+      "needs_helper_and_permission_review": true
+    },
+    {
+      "id": "TST-027",
+      "spec": "tenant/stock/stock.spec.ts",
+      "explicit_role_literals": [
+        "PW_STOCK_READ_ONLY"
+      ],
+      "needs_helper_and_permission_review": true
+    },
+    {
+      "id": "TST-037",
+      "spec": "tenant/stock/stock.spec.ts",
+      "explicit_role_literals": [
+        "PW_STOCK_NO_READ"
+      ],
+      "needs_helper_and_permission_review": true
+    },
+    {
+      "id": "TST-046",
+      "spec": "tenant/stock/stock.spec.ts",
+      "explicit_role_literals": [
+        "PW_STOCK_READ_ONLY"
+      ],
+      "needs_helper_and_permission_review": true
+    },
+    {
+      "id": "TST-047",
+      "spec": "tenant/stock/stock.spec.ts",
+      "explicit_role_literals": [
+        "PW_STOCK_READ_ONLY"
+      ],
+      "needs_helper_and_permission_review": true
+    },
+    {
+      "id": "TSTR-046",
+      "spec": "tenant/stock-transfers/stock-transfers.spec.ts",
+      "explicit_role_literals": [
+        "PW_TRANSFER_READ_ONLY"
+      ],
+      "needs_helper_and_permission_review": true
+    }
+  ]
+}

@@ -1,0 +1,28 @@
+{
+  "batch": 242,
+  "group": "BULK_SAFE_17",
+  "count": 1,
+  "prior_batch_user_confirmed_green": [
+    "TSN-046"
+  ],
+  "confirmed_before": 2685,
+  "remaining_before": 253,
+  "selected": [
+    "TSN-042"
+  ],
+  "pages": {
+    "scanner": {
+      "route": "/scanner",
+      "heading": "Shipment QR Scanner"
+    }
+  },
+  "spec_files": {
+    "tenant/scanner/scanner-batch32.spec.ts": {
+      "selected": [
+        "TSN-042"
+      ]
+    }
+  },
+  "basis": "Keep original exact message, one task request and zero receipt assertions; use shipment source fixture from confirmed sibling TSN-041.",
+  "original_body_sha256": "a3706ebcf1ce13a5146ae70e7f217f1e6ee37bbfdcd82c771aa2e8b62e49ea2d"
+}
