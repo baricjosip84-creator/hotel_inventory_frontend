@@ -1,0 +1,43 @@
+{
+  "batch": 241,
+  "group": "BULK_SAFE_17",
+  "count": 2,
+  "prior_green": [
+    "TIR-030",
+    "TIR-032",
+    "TOUT-027"
+  ],
+  "confirmed_before": 2683,
+  "remaining_before": 255,
+  "selected": [
+    "TSN-045",
+    "TSN-046"
+  ],
+  "pages": {
+    "scanner": {
+      "route": "/scanner",
+      "heading": "Shipment QR Scanner"
+    }
+  },
+  "spec_files": {
+    "tenant/scanner/scanner-batch32.spec.ts": {
+      "selected": [
+        "TSN-045",
+        "TSN-046"
+      ]
+    }
+  },
+  "tests": {
+    "TSN-045": {
+      "file": "tenant/scanner/scanner-batch32.spec.ts",
+      "title": "TSN-045 Hardware camera permission denial: reserved for controlled Phase 2 browser device fixture",
+      "sha256_original_body": "573f3f5932fb15474267a2130c7b85612450fc75d228759bd3e86ac8c89a66f6"
+    },
+    "TSN-046": {
+      "file": "tenant/scanner/scanner-batch32.spec.ts",
+      "title": "TSN-046 Live camera start/stop exclusivity: reserved for controlled Phase 2 device fixture",
+      "sha256_original_body": "871109c9a6f77e24cf82f1c63de656ac0862fe99bd794be7cd831983b521cc0c"
+    }
+  },
+  "basis": "Preserve exact original skipped placeholder IDs and titles; activate dedicated controlled Chromium fake video device and simulated permission rejection; require actual app UI and track lifecycle evidence and zero intercepted scan writes."
+}

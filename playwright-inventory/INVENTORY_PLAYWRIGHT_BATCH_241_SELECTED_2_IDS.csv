@@ -1,0 +1,3 @@
+test_id,spec_file,title,previous,next_stage,reason
+TSN-045,tenant/scanner/scanner-batch32.spec.ts,TSN-045 Hardware camera permission denial: reserved for controlled Phase 2 browser device fixture,UNAPPROVED,B241_CONTROLLED_CAMERA,Original unconditional skip replaced in CI runtime only by source-aligned browser camera fixture; actual live result pending.
+TSN-046,tenant/scanner/scanner-batch32.spec.ts,TSN-046 Live camera start/stop exclusivity: reserved for controlled Phase 2 device fixture,UNAPPROVED,B241_CONTROLLED_CAMERA,Original unconditional skip replaced in CI runtime only by source-aligned browser camera fixture; actual live result pending.
