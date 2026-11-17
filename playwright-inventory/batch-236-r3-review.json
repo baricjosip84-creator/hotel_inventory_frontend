@@ -1,0 +1,142 @@
+{
+  "group": "BULK_SAFE_17",
+  "count": 6,
+  "passed": [
+    "TEXR-003",
+    "TEXR-026",
+    "TICAP-020",
+    "TICAP-021",
+    "TICAP-026",
+    "TICAP-032",
+    "TICAP-044",
+    "TICAP-046",
+    "TICAP-048",
+    "TICAP-052",
+    "TICAP-060",
+    "TICAP-061",
+    "TICAP-062",
+    "TICAP-063",
+    "TICAP-064",
+    "TICAP-068",
+    "TICAP-073",
+    "TICAP-074",
+    "TICAP-080",
+    "TICAP-084",
+    "TICAP-086",
+    "TICAP-087",
+    "TICAP-102",
+    "TICAP-125",
+    "TICAP-142",
+    "TICAP-151",
+    "TIR-001",
+    "TIR-002",
+    "TIR-003",
+    "TIR-004",
+    "TIR-005",
+    "TIR-006",
+    "TIR-007",
+    "TIR-008",
+    "TIR-009",
+    "TIR-010",
+    "TIR-011",
+    "TIR-012",
+    "TIR-013",
+    "TIR-014",
+    "TIR-015",
+    "TIR-016",
+    "TIR-017",
+    "TIR-018",
+    "TIR-019",
+    "TIR-021",
+    "TIR-022",
+    "TIR-026",
+    "TIR-029",
+    "TIR-038",
+    "TIR-042",
+    "TIR-043",
+    "TIR-047",
+    "TIR-048",
+    "TIR-049",
+    "TIR-050"
+  ],
+  "selected": [
+    "TICAP-036",
+    "TICAP-132",
+    "TICAP-144",
+    "TICAP-148",
+    "TICAP-150",
+    "TIR-037"
+  ],
+  "held": [
+    "TICAP-035",
+    "TICAP-143"
+  ],
+  "pages": {
+    "inventory-requisitions": {
+      "route": "/inventory-requisitions",
+      "text": "Internal stock requests"
+    },
+    "inventory-capabilities": {
+      "route": "/inventory-capabilities",
+      "heading": "Advanced inventory workspace"
+    }
+  },
+  "review": [
+    {
+      "test_id": "TICAP-035",
+      "classification": "suspected app defect / needs retest",
+      "status": "HELD_NEEDS_TRIAGE",
+      "evidence": "Error: expect(locator).toBeVisible() failed Locator: getByText('Webhook disabled.').first()",
+      "next_action": "Source status mutation has no inline acknowledgement in recovered application source; exact required acknowledgement missing live. Investigate deployed UI and stateful readback before changing requirement."
+    },
+    {
+      "test_id": "TICAP-036",
+      "classification": "test defect / needs retest",
+      "status": "RECHECK_PENDING",
+      "evidence": "Error: expect(locator).toBeVisible() failed Locator: getByText('PW47_NEW_FAKE_SECRET')",
+      "next_action": "Recheck action with native confirmation handler; retain exact replacement-secret expectation and POST proof."
+    },
+    {
+      "test_id": "TICAP-132",
+      "classification": "test defect / needs retest",
+      "status": "RECHECK_PENDING",
+      "evidence": "Test timeout of 150000ms exceeded.",
+      "next_action": "Locate exact second component via nearest Remove-bearing ancestor, not stale style class."
+    },
+    {
+      "test_id": "TICAP-143",
+      "classification": "suspected app defect / needs retest",
+      "status": "HELD_NEEDS_TRIAGE",
+      "evidence": "Error: expect(received).toBe(expected) // Object.is equality",
+      "next_action": "Same status-mutation contract as TICAP-035; genuine version assertion not reached successfully; inspect deployed confirmation and acknowledgement before recheck."
+    },
+    {
+      "test_id": "TICAP-144",
+      "classification": "test defect / needs retest",
+      "status": "RECHECK_PENDING",
+      "evidence": "Error: expect(locator).toBeVisible() failed Locator: getByRole('alert').filter({ hasText: /version conflict|changed/i }).first()",
+      "next_action": "Recheck action with native confirmation handler; retain error and no-secret assertions."
+    },
+    {
+      "test_id": "TICAP-148",
+      "classification": "test defect / needs retest",
+      "status": "RECHECK_PENDING",
+      "evidence": "Test timeout of 150000ms exceeded.",
+      "next_action": "Use source-proven location combobox with exact warehouse option; check no eligible lots before disabled registration."
+    },
+    {
+      "test_id": "TICAP-150",
+      "classification": "test defect / needs retest",
+      "status": "RECHECK_PENDING",
+      "evidence": "Error: expect(received).toMatchObject(expected)",
+      "next_action": "Await exact synthetic UoM POST transport before asserting payload."
+    },
+    {
+      "test_id": "TIR-037",
+      "classification": "test defect / needs retest",
+      "status": "RECHECK_PENDING",
+      "evidence": "Error: expect(locator).toBeVisible() failed Locator:  getByText('Synthetic Product').first()",
+      "next_action": "Scope product evidence to history row with Issue verified, not hidden product option."
+    }
+  ]
+}
