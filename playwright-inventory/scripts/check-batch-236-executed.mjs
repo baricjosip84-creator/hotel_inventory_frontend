@@ -1,6 +1,6 @@
 import fs from 'node:fs';import assert from 'node:assert/strict';
-const p=JSON.parse(fs.readFileSync('batch-236-review.json','utf8')),expected=p.selected,sort=x=>[...x].sort();
-assert.equal(expected.length,150);
+const p=JSON.parse(fs.readFileSync('batch-236-r2-review.json','utf8')),expected=p.selected,sort=x=>[...x].sort();
+assert.equal(expected.length,64);
 assert(fs.existsSync('batch-236-live-access.json'),'B236 not executed: access preflight missing');
 const access=JSON.parse(fs.readFileSync('batch-236-live-access.json','utf8'));
 assert.equal(access.status,'PROBED','B236 access preflight incomplete');
@@ -18,7 +18,7 @@ function walk(s){
 for(const s of report.suites??[])walk(s);
 assert([...seen.keys()].every(i=>access.runnable.includes(i)));
 const pass=expected.filter(i=>seen.get(i)==='PASS'),unresolved=expected.filter(i=>seen.get(i)!=='PASS');
-console.log('B236 ACTUAL PASS '+pass.length+'/150');
+console.log('B236 R2 ACTUAL PASS '+pass.length+'/'+expected.length);
 console.log('PASS IDs: '+pass.join(','));
 console.log('UNRESOLVED IDs: '+unresolved.join(','));
 assert.equal(unresolved.length,0,'No false green: failed, skipped, unexecuted or access-gated originals remain unresolved.');

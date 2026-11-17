@@ -1,0 +1,722 @@
+{
+  "group": "BULK_SAFE_17",
+  "count": 64,
+  "passed": [
+    "TET-009",
+    "TET-011",
+    "TET-012",
+    "TET-015",
+    "TET-016",
+    "TET-018",
+    "TEXR-001",
+    "TEXR-002",
+    "TEXR-004",
+    "TEXR-005",
+    "TEXR-006",
+    "TEXR-007",
+    "TEXR-008",
+    "TEXR-009",
+    "TEXR-010",
+    "TEXR-011",
+    "TEXR-012",
+    "TEXR-013",
+    "TEXR-014",
+    "TEXR-015",
+    "TEXR-016",
+    "TEXR-017",
+    "TEXR-018",
+    "TEXR-020",
+    "TEXR-021",
+    "TEXR-023",
+    "TEXR-037",
+    "TEXR-045",
+    "TEXR-046",
+    "TEXR-047",
+    "TEXR-048",
+    "TEXR-049",
+    "TICAP-049",
+    "TICAP-058",
+    "TICAP-059",
+    "TICAP-066",
+    "TICAP-067",
+    "TICAP-070",
+    "TICAP-071",
+    "TICAP-072",
+    "TICAP-075",
+    "TICAP-076",
+    "TICAP-077",
+    "TICAP-078",
+    "TICAP-079",
+    "TICAP-081",
+    "TICAP-083",
+    "TICAP-085",
+    "TICAP-088",
+    "TICAP-089",
+    "TICAP-092",
+    "TICAP-096",
+    "TICAP-098",
+    "TICAP-101",
+    "TICAP-103",
+    "TICAP-113",
+    "TICAP-120",
+    "TICAP-122",
+    "TICAP-123",
+    "TICAP-124",
+    "TICAP-126",
+    "TICAP-127",
+    "TICAP-129",
+    "TICAP-136",
+    "TICAP-137",
+    "TICAP-138",
+    "TICAP-139",
+    "TICAP-154",
+    "TICAP-156",
+    "TICAP-158",
+    "TICAP-159",
+    "TICAP-160"
+  ],
+  "selected": [
+    "TEXR-003",
+    "TEXR-026",
+    "TICAP-020",
+    "TICAP-021",
+    "TICAP-026",
+    "TICAP-032",
+    "TICAP-035",
+    "TICAP-036",
+    "TICAP-044",
+    "TICAP-046",
+    "TICAP-048",
+    "TICAP-052",
+    "TICAP-060",
+    "TICAP-061",
+    "TICAP-062",
+    "TICAP-063",
+    "TICAP-064",
+    "TICAP-068",
+    "TICAP-073",
+    "TICAP-074",
+    "TICAP-080",
+    "TICAP-084",
+    "TICAP-086",
+    "TICAP-087",
+    "TICAP-102",
+    "TICAP-125",
+    "TICAP-132",
+    "TICAP-142",
+    "TICAP-143",
+    "TICAP-144",
+    "TICAP-148",
+    "TICAP-150",
+    "TICAP-151",
+    "TIR-001",
+    "TIR-002",
+    "TIR-003",
+    "TIR-004",
+    "TIR-005",
+    "TIR-006",
+    "TIR-007",
+    "TIR-008",
+    "TIR-009",
+    "TIR-010",
+    "TIR-011",
+    "TIR-012",
+    "TIR-013",
+    "TIR-014",
+    "TIR-015",
+    "TIR-016",
+    "TIR-017",
+    "TIR-018",
+    "TIR-019",
+    "TIR-021",
+    "TIR-022",
+    "TIR-026",
+    "TIR-029",
+    "TIR-037",
+    "TIR-038",
+    "TIR-042",
+    "TIR-043",
+    "TIR-047",
+    "TIR-048",
+    "TIR-049",
+    "TIR-050"
+  ],
+  "held": [
+    "TET-034",
+    "TET-035",
+    "TET-036",
+    "TET-037",
+    "TET-038",
+    "TET-039",
+    "TET-040",
+    "TET-045",
+    "TICAP-051",
+    "TICAP-093",
+    "TICAP-094",
+    "TICAP-095",
+    "TICAP-110",
+    "TICAP-155"
+  ],
+  "pages": {
+    "execution-requests": {
+      "route": "/execution-requests",
+      "heading": "Controlled execution requests"
+    },
+    "inventory-requisitions": {
+      "route": "/inventory-requisitions",
+      "text": "Internal stock requests"
+    },
+    "inventory-capabilities": {
+      "route": "/inventory-capabilities",
+      "heading": "Advanced inventory workspace"
+    }
+  },
+  "review": [
+    {
+      "test_id": "TET-034",
+      "classification": "suspected app defect / needs retest",
+      "status": "HELD_NEEDS_TRIAGE",
+      "evidence": "Error: expect(received).toBe(expected) // Object.is equality",
+      "next_action": "Unresolved interaction or UI contract; inspect live error-context/DOM before changing assertion."
+    },
+    {
+      "test_id": "TET-035",
+      "classification": "suspected app defect / needs retest",
+      "status": "HELD_NEEDS_TRIAGE",
+      "evidence": "Test timeout of 150000ms exceeded.",
+      "next_action": "Unresolved interaction or UI contract; inspect live error-context/DOM before changing assertion."
+    },
+    {
+      "test_id": "TET-036",
+      "classification": "suspected app defect / needs retest",
+      "status": "HELD_NEEDS_TRIAGE",
+      "evidence": "Error: expect(locator).toBeDisabled() failed Locator: getByRole('dialog').getByLabel('Assign to').locator('option[value=\"12345678-1234-4234-8234-123456789007\"]')",
+      "next_action": "Unresolved interaction or UI contract; inspect live error-context/DOM before changing assertion."
+    },
+    {
+      "test_id": "TET-037",
+      "classification": "suspected app defect / needs retest",
+      "status": "HELD_NEEDS_TRIAGE",
+      "evidence": "Test timeout of 150000ms exceeded.",
+      "next_action": "Unresolved interaction or UI contract; inspect live error-context/DOM before changing assertion."
+    },
+    {
+      "test_id": "TET-038",
+      "classification": "suspected app defect / needs retest",
+      "status": "HELD_NEEDS_TRIAGE",
+      "evidence": "Test timeout of 150000ms exceeded.",
+      "next_action": "Unresolved interaction or UI contract; inspect live error-context/DOM before changing assertion."
+    },
+    {
+      "test_id": "TET-039",
+      "classification": "suspected app defect / needs retest",
+      "status": "HELD_NEEDS_TRIAGE",
+      "evidence": "Test timeout of 150000ms exceeded.",
+      "next_action": "Unresolved interaction or UI contract; inspect live error-context/DOM before changing assertion."
+    },
+    {
+      "test_id": "TET-040",
+      "classification": "suspected app defect / needs retest",
+      "status": "HELD_NEEDS_TRIAGE",
+      "evidence": "Error: expect(received).toBe(expected) // Object.is equality",
+      "next_action": "Unresolved interaction or UI contract; inspect live error-context/DOM before changing assertion."
+    },
+    {
+      "test_id": "TET-045",
+      "classification": "suspected app defect / needs retest",
+      "status": "HELD_NEEDS_TRIAGE",
+      "evidence": "Error: expect(received).toBe(expected) // Object.is equality",
+      "next_action": "Unresolved interaction or UI contract; inspect live error-context/DOM before changing assertion."
+    },
+    {
+      "test_id": "TEXR-003",
+      "classification": "test defect / needs retest",
+      "status": "RECHECK_PENDING",
+      "evidence": "Error: expect(locator).toBeVisible() failed Locator:  getByText('Synthetic readiness evidence only')",
+      "next_action": "Source-backed fixture/locator or asynchronous request correction; live behavior not yet verified."
+    },
+    {
+      "test_id": "TEXR-026",
+      "classification": "test defect / needs retest",
+      "status": "RECHECK_PENDING",
+      "evidence": "Error: expect(locator).toBeDisabled() failed Locator:  locator('xpath=.//label[normalize-space(text()[1])=\\'Product\\' or span[normalize-space(.)=\\'Product\\']]/select')",
+      "next_action": "Source-backed fixture/locator or asynchronous request correction; live behavior not yet verified."
+    },
+    {
+      "test_id": "TICAP-020",
+      "classification": "environment / permissions",
+      "status": "RECHECK_PENDING",
+      "evidence": "Error: B236 target access stopped: HTTP 429",
+      "next_action": "Rate-limit or safety circuit; no original assertion executed; pace authorized access, preserve circuit."
+    },
+    {
+      "test_id": "TICAP-021",
+      "classification": "environment / permissions",
+      "status": "RECHECK_PENDING",
+      "evidence": "Error: B234 authentication circuit open; no further live login attempted",
+      "next_action": "Rate-limit or safety circuit; no original assertion executed; pace authorized access, preserve circuit."
+    },
+    {
+      "test_id": "TICAP-026",
+      "classification": "environment / permissions",
+      "status": "RECHECK_PENDING",
+      "evidence": "Error: B234 authentication circuit open; no further live login attempted",
+      "next_action": "Rate-limit or safety circuit; no original assertion executed; pace authorized access, preserve circuit."
+    },
+    {
+      "test_id": "TICAP-032",
+      "classification": "environment / permissions",
+      "status": "RECHECK_PENDING",
+      "evidence": "Error: B234 authentication circuit open; no further live login attempted",
+      "next_action": "Rate-limit or safety circuit; no original assertion executed; pace authorized access, preserve circuit."
+    },
+    {
+      "test_id": "TICAP-035",
+      "classification": "environment / permissions",
+      "status": "RECHECK_PENDING",
+      "evidence": "Error: B234 authentication circuit open; no further live login attempted",
+      "next_action": "Rate-limit or safety circuit; no original assertion executed; pace authorized access, preserve circuit."
+    },
+    {
+      "test_id": "TICAP-036",
+      "classification": "environment / permissions",
+      "status": "RECHECK_PENDING",
+      "evidence": "Error: B234 authentication circuit open; no further live login attempted",
+      "next_action": "Rate-limit or safety circuit; no original assertion executed; pace authorized access, preserve circuit."
+    },
+    {
+      "test_id": "TICAP-044",
+      "classification": "test defect / needs retest",
+      "status": "RECHECK_PENDING",
+      "evidence": "Error: expect(locator).toBeDisabled() failed Locator:  getByRole('group', { name: 'Events' })",
+      "next_action": "Source-backed fixture/locator or asynchronous request correction; live behavior not yet verified."
+    },
+    {
+      "test_id": "TICAP-046",
+      "classification": "test defect / needs retest",
+      "status": "RECHECK_PENDING",
+      "evidence": "Error: expect(locator).toBeVisible() failed Locator: getByRole('alert').filter({ hasText: 'This configuration changed' })",
+      "next_action": "Source-backed fixture/locator or asynchronous request correction; live behavior not yet verified."
+    },
+    {
+      "test_id": "TICAP-048",
+      "classification": "test defect / needs retest",
+      "status": "RECHECK_PENDING",
+      "evidence": "Error: expect(locator).toBeVisible() failed Locator: getByRole('alert').filter({ hasText: 'The webhook page is no longer valid. Reload the webhook registry.' })",
+      "next_action": "Source-backed fixture/locator or asynchronous request correction; live behavior not yet verified."
+    },
+    {
+      "test_id": "TICAP-051",
+      "classification": "suspected app defect / needs retest",
+      "status": "HELD_NEEDS_TRIAGE",
+      "evidence": "Error: expect(locator).toBeVisible() failed Locator: getByText('Connection disabled.').first()",
+      "next_action": "Unresolved interaction or UI contract; inspect live error-context/DOM before changing assertion."
+    },
+    {
+      "test_id": "TICAP-052",
+      "classification": "test defect / needs retest",
+      "status": "RECHECK_PENDING",
+      "evidence": "Error: expect(locator).toBeVisible() failed Locator: getByText('This configuration changed after you opened it.')",
+      "next_action": "Source-backed fixture/locator or asynchronous request correction; live behavior not yet verified."
+    },
+    {
+      "test_id": "TICAP-060",
+      "classification": "test defect / needs retest",
+      "status": "RECHECK_PENDING",
+      "evidence": "Error: expect(locator).toBeVisible() failed Locator: getByText('This configuration changed after you opened it.')",
+      "next_action": "Source-backed fixture/locator or asynchronous request correction; live behavior not yet verified."
+    },
+    {
+      "test_id": "TICAP-061",
+      "classification": "test defect / needs retest",
+      "status": "RECHECK_PENDING",
+      "evidence": "Error: expect(locator).toBeVisible() failed Locator: getByText('Serial tracking cannot be disabled while serial identities still exist for this product.')",
+      "next_action": "Source-backed fixture/locator or asynchronous request correction; live behavior not yet verified."
+    },
+    {
+      "test_id": "TICAP-062",
+      "classification": "test defect / needs retest",
+      "status": "RECHECK_PENDING",
+      "evidence": "Error: locator.fill: Error: strict mode violation: getByPlaceholder('Serial number') resolved to 2 elements:",
+      "next_action": "Source-backed fixture/locator or asynchronous request correction; live behavior not yet verified."
+    },
+    {
+      "test_id": "TICAP-063",
+      "classification": "test defect / needs retest",
+      "status": "RECHECK_PENDING",
+      "evidence": "Error: locator.fill: Error: strict mode violation: getByPlaceholder('Serial number') resolved to 2 elements:",
+      "next_action": "Source-backed fixture/locator or asynchronous request correction; live behavior not yet verified."
+    },
+    {
+      "test_id": "TICAP-064",
+      "classification": "test defect / needs retest",
+      "status": "RECHECK_PENDING",
+      "evidence": "Error: locator.fill: Error: strict mode violation: getByPlaceholder('Serial number') resolved to 2 elements:",
+      "next_action": "Source-backed fixture/locator or asynchronous request correction; live behavior not yet verified."
+    },
+    {
+      "test_id": "TICAP-068",
+      "classification": "test defect / needs retest",
+      "status": "RECHECK_PENDING",
+      "evidence": "Error: locator.fill: Error: strict mode violation: getByPlaceholder('Serial number') resolved to 2 elements:",
+      "next_action": "Source-backed fixture/locator or asynchronous request correction; live behavior not yet verified."
+    },
+    {
+      "test_id": "TICAP-073",
+      "classification": "test defect / needs retest",
+      "status": "RECHECK_PENDING",
+      "evidence": "Error: expect(locator).toBeVisible() failed Locator: getByText('The save was acknowledged, but the conversion could not be checked.')",
+      "next_action": "Source-backed fixture/locator or asynchronous request correction; live behavior not yet verified."
+    },
+    {
+      "test_id": "TICAP-074",
+      "classification": "test defect / needs retest",
+      "status": "RECHECK_PENDING",
+      "evidence": "Error: expect(locator).toBeVisible() failed Locator: getByText('The save was acknowledged, but the conversion was not found on reload.')",
+      "next_action": "Source-backed fixture/locator or asynchronous request correction; live behavior not yet verified."
+    },
+    {
+      "test_id": "TICAP-080",
+      "classification": "test defect / needs retest",
+      "status": "RECHECK_PENDING",
+      "evidence": "Error: expect(locator).toBeVisible() failed Locator: getByText('This configuration changed after you opened it.')",
+      "next_action": "Source-backed fixture/locator or asynchronous request correction; live behavior not yet verified."
+    },
+    {
+      "test_id": "TICAP-084",
+      "classification": "test defect / needs retest",
+      "status": "RECHECK_PENDING",
+      "evidence": "Error: expect(locator).toBeVisible() failed Locator: getByText('This configuration changed after you opened it.')",
+      "next_action": "Source-backed fixture/locator or asynchronous request correction; live behavior not yet verified."
+    },
+    {
+      "test_id": "TICAP-086",
+      "classification": "test defect / needs retest",
+      "status": "RECHECK_PENDING",
+      "evidence": "Error: expect(locator).toBeVisible() failed Locator: getByText('This configuration changed after you opened it.')",
+      "next_action": "Source-backed fixture/locator or asynchronous request correction; live behavior not yet verified."
+    },
+    {
+      "test_id": "TICAP-087",
+      "classification": "test defect / needs retest",
+      "status": "RECHECK_PENDING",
+      "evidence": "Error: expect(locator).toBeVisible() failed Locator: getByText('This field cannot become required while existing records are missing a value.')",
+      "next_action": "Source-backed fixture/locator or asynchronous request correction; live behavior not yet verified."
+    },
+    {
+      "test_id": "TICAP-093",
+      "classification": "suspected app defect / needs retest",
+      "status": "HELD_NEEDS_TRIAGE",
+      "evidence": "Error: expect(locator).toBeVisible() failed Locator: getByText('The landed-cost preview changed. Review the latest allocation before finalizing.')",
+      "next_action": "Unresolved interaction or UI contract; inspect live error-context/DOM before changing assertion."
+    },
+    {
+      "test_id": "TICAP-094",
+      "classification": "suspected app defect / needs retest",
+      "status": "HELD_NEEDS_TRIAGE",
+      "evidence": "Error: expect(received).toHaveLength(expected)",
+      "next_action": "Unresolved interaction or UI contract; inspect live error-context/DOM before changing assertion."
+    },
+    {
+      "test_id": "TICAP-095",
+      "classification": "suspected app defect / needs retest",
+      "status": "HELD_NEEDS_TRIAGE",
+      "evidence": "Error: expect(locator).toBeVisible() failed Locator: getByText('Fixture action rejected')",
+      "next_action": "Unresolved interaction or UI contract; inspect live error-context/DOM before changing assertion."
+    },
+    {
+      "test_id": "TICAP-102",
+      "classification": "test defect / needs retest",
+      "status": "RECHECK_PENDING",
+      "evidence": "Error: expect(received).toBe(expected) // Object.is equality",
+      "next_action": "Source-backed fixture/locator or asynchronous request correction; live behavior not yet verified."
+    },
+    {
+      "test_id": "TICAP-110",
+      "classification": "suspected app defect / needs retest",
+      "status": "HELD_NEEDS_TRIAGE",
+      "evidence": "Test timeout of 150000ms exceeded.",
+      "next_action": "Unresolved interaction or UI contract; inspect live error-context/DOM before changing assertion."
+    },
+    {
+      "test_id": "TICAP-125",
+      "classification": "test defect / needs retest",
+      "status": "RECHECK_PENDING",
+      "evidence": "Error: expect(received).toBe(expected) // Object.is equality",
+      "next_action": "Source-backed fixture/locator or asynchronous request correction; live behavior not yet verified."
+    },
+    {
+      "test_id": "TICAP-132",
+      "classification": "test defect / needs retest",
+      "status": "RECHECK_PENDING",
+      "evidence": "Error: expect(locator).toHaveCount(expected) failed Locator:  getByRole('heading', { name: 'Create BOM', exact: true }).locator('..').getByLabel('Component 2')",
+      "next_action": "Source-backed fixture/locator or asynchronous request correction; live behavior not yet verified."
+    },
+    {
+      "test_id": "TICAP-142",
+      "classification": "environment / permissions",
+      "status": "RECHECK_PENDING",
+      "evidence": "Error: B234 authentication circuit open; no further live login attempted",
+      "next_action": "Rate-limit or safety circuit; no original assertion executed; pace authorized access, preserve circuit."
+    },
+    {
+      "test_id": "TICAP-143",
+      "classification": "environment / permissions",
+      "status": "RECHECK_PENDING",
+      "evidence": "Error: B234 authentication circuit open; no further live login attempted",
+      "next_action": "Rate-limit or safety circuit; no original assertion executed; pace authorized access, preserve circuit."
+    },
+    {
+      "test_id": "TICAP-144",
+      "classification": "environment / permissions",
+      "status": "RECHECK_PENDING",
+      "evidence": "Error: B234 authentication circuit open; no further live login attempted",
+      "next_action": "Rate-limit or safety circuit; no original assertion executed; pace authorized access, preserve circuit."
+    },
+    {
+      "test_id": "TICAP-148",
+      "classification": "environment / permissions",
+      "status": "RECHECK_PENDING",
+      "evidence": "Error: B234 authentication circuit open; no further live login attempted",
+      "next_action": "Rate-limit or safety circuit; no original assertion executed; pace authorized access, preserve circuit."
+    },
+    {
+      "test_id": "TICAP-150",
+      "classification": "environment / permissions",
+      "status": "RECHECK_PENDING",
+      "evidence": "Error: B234 authentication circuit open; no further live login attempted",
+      "next_action": "Rate-limit or safety circuit; no original assertion executed; pace authorized access, preserve circuit."
+    },
+    {
+      "test_id": "TICAP-151",
+      "classification": "environment / permissions",
+      "status": "RECHECK_PENDING",
+      "evidence": "Error: B234 authentication circuit open; no further live login attempted",
+      "next_action": "Rate-limit or safety circuit; no original assertion executed; pace authorized access, preserve circuit."
+    },
+    {
+      "test_id": "TICAP-155",
+      "classification": "suspected app defect / needs retest",
+      "status": "HELD_NEEDS_TRIAGE",
+      "evidence": "Error: expect(locator).toBeDisabled() failed Locator: getByRole('button', { name: 'Finalize cost', exact: true })",
+      "next_action": "Unresolved interaction or UI contract; inspect live error-context/DOM before changing assertion."
+    },
+    {
+      "test_id": "TIR-001",
+      "classification": "environment / permissions",
+      "status": "RECHECK_PENDING",
+      "evidence": "Error: B234 authentication circuit open; no further live login attempted",
+      "next_action": "Rate-limit or safety circuit; no original assertion executed; pace authorized access, preserve circuit."
+    },
+    {
+      "test_id": "TIR-002",
+      "classification": "environment / permissions",
+      "status": "RECHECK_PENDING",
+      "evidence": "Error: B234 authentication circuit open; no further live login attempted",
+      "next_action": "Rate-limit or safety circuit; no original assertion executed; pace authorized access, preserve circuit."
+    },
+    {
+      "test_id": "TIR-003",
+      "classification": "environment / permissions",
+      "status": "RECHECK_PENDING",
+      "evidence": "Error: B234 authentication circuit open; no further live login attempted",
+      "next_action": "Rate-limit or safety circuit; no original assertion executed; pace authorized access, preserve circuit."
+    },
+    {
+      "test_id": "TIR-004",
+      "classification": "environment / permissions",
+      "status": "RECHECK_PENDING",
+      "evidence": "Error: B234 authentication circuit open; no further live login attempted",
+      "next_action": "Rate-limit or safety circuit; no original assertion executed; pace authorized access, preserve circuit."
+    },
+    {
+      "test_id": "TIR-005",
+      "classification": "environment / permissions",
+      "status": "RECHECK_PENDING",
+      "evidence": "Error: B234 authentication circuit open; no further live login attempted",
+      "next_action": "Rate-limit or safety circuit; no original assertion executed; pace authorized access, preserve circuit."
+    },
+    {
+      "test_id": "TIR-006",
+      "classification": "environment / permissions",
+      "status": "RECHECK_PENDING",
+      "evidence": "Error: B234 authentication circuit open; no further live login attempted",
+      "next_action": "Rate-limit or safety circuit; no original assertion executed; pace authorized access, preserve circuit."
+    },
+    {
+      "test_id": "TIR-007",
+      "classification": "environment / permissions",
+      "status": "RECHECK_PENDING",
+      "evidence": "Error: B234 authentication circuit open; no further live login attempted",
+      "next_action": "Rate-limit or safety circuit; no original assertion executed; pace authorized access, preserve circuit."
+    },
+    {
+      "test_id": "TIR-008",
+      "classification": "environment / permissions",
+      "status": "RECHECK_PENDING",
+      "evidence": "Error: B234 authentication circuit open; no further live login attempted",
+      "next_action": "Rate-limit or safety circuit; no original assertion executed; pace authorized access, preserve circuit."
+    },
+    {
+      "test_id": "TIR-009",
+      "classification": "environment / permissions",
+      "status": "RECHECK_PENDING",
+      "evidence": "Error: B234 authentication circuit open; no further live login attempted",
+      "next_action": "Rate-limit or safety circuit; no original assertion executed; pace authorized access, preserve circuit."
+    },
+    {
+      "test_id": "TIR-010",
+      "classification": "environment / permissions",
+      "status": "RECHECK_PENDING",
+      "evidence": "Error: B234 authentication circuit open; no further live login attempted",
+      "next_action": "Rate-limit or safety circuit; no original assertion executed; pace authorized access, preserve circuit."
+    },
+    {
+      "test_id": "TIR-011",
+      "classification": "environment / permissions",
+      "status": "RECHECK_PENDING",
+      "evidence": "Error: B234 authentication circuit open; no further live login attempted",
+      "next_action": "Rate-limit or safety circuit; no original assertion executed; pace authorized access, preserve circuit."
+    },
+    {
+      "test_id": "TIR-012",
+      "classification": "environment / permissions",
+      "status": "RECHECK_PENDING",
+      "evidence": "Error: B234 authentication circuit open; no further live login attempted",
+      "next_action": "Rate-limit or safety circuit; no original assertion executed; pace authorized access, preserve circuit."
+    },
+    {
+      "test_id": "TIR-013",
+      "classification": "environment / permissions",
+      "status": "RECHECK_PENDING",
+      "evidence": "Error: B234 authentication circuit open; no further live login attempted",
+      "next_action": "Rate-limit or safety circuit; no original assertion executed; pace authorized access, preserve circuit."
+    },
+    {
+      "test_id": "TIR-014",
+      "classification": "environment / permissions",
+      "status": "RECHECK_PENDING",
+      "evidence": "Error: B234 authentication circuit open; no further live login attempted",
+      "next_action": "Rate-limit or safety circuit; no original assertion executed; pace authorized access, preserve circuit."
+    },
+    {
+      "test_id": "TIR-015",
+      "classification": "environment / permissions",
+      "status": "RECHECK_PENDING",
+      "evidence": "Error: B234 authentication circuit open; no further live login attempted",
+      "next_action": "Rate-limit or safety circuit; no original assertion executed; pace authorized access, preserve circuit."
+    },
+    {
+      "test_id": "TIR-016",
+      "classification": "environment / permissions",
+      "status": "RECHECK_PENDING",
+      "evidence": "Error: B234 authentication circuit open; no further live login attempted",
+      "next_action": "Rate-limit or safety circuit; no original assertion executed; pace authorized access, preserve circuit."
+    },
+    {
+      "test_id": "TIR-017",
+      "classification": "environment / permissions",
+      "status": "RECHECK_PENDING",
+      "evidence": "Error: B234 authentication circuit open; no further live login attempted",
+      "next_action": "Rate-limit or safety circuit; no original assertion executed; pace authorized access, preserve circuit."
+    },
+    {
+      "test_id": "TIR-018",
+      "classification": "environment / permissions",
+      "status": "RECHECK_PENDING",
+      "evidence": "Error: B234 authentication circuit open; no further live login attempted",
+      "next_action": "Rate-limit or safety circuit; no original assertion executed; pace authorized access, preserve circuit."
+    },
+    {
+      "test_id": "TIR-019",
+      "classification": "environment / permissions",
+      "status": "RECHECK_PENDING",
+      "evidence": "Error: B234 authentication circuit open; no further live login attempted",
+      "next_action": "Rate-limit or safety circuit; no original assertion executed; pace authorized access, preserve circuit."
+    },
+    {
+      "test_id": "TIR-021",
+      "classification": "environment / permissions",
+      "status": "RECHECK_PENDING",
+      "evidence": "Error: B234 authentication circuit open; no further live login attempted",
+      "next_action": "Rate-limit or safety circuit; no original assertion executed; pace authorized access, preserve circuit."
+    },
+    {
+      "test_id": "TIR-022",
+      "classification": "environment / permissions",
+      "status": "RECHECK_PENDING",
+      "evidence": "Error: B234 authentication circuit open; no further live login attempted",
+      "next_action": "Rate-limit or safety circuit; no original assertion executed; pace authorized access, preserve circuit."
+    },
+    {
+      "test_id": "TIR-026",
+      "classification": "environment / permissions",
+      "status": "RECHECK_PENDING",
+      "evidence": "Error: B234 authentication circuit open; no further live login attempted",
+      "next_action": "Rate-limit or safety circuit; no original assertion executed; pace authorized access, preserve circuit."
+    },
+    {
+      "test_id": "TIR-029",
+      "classification": "environment / permissions",
+      "status": "RECHECK_PENDING",
+      "evidence": "Error: B234 authentication circuit open; no further live login attempted",
+      "next_action": "Rate-limit or safety circuit; no original assertion executed; pace authorized access, preserve circuit."
+    },
+    {
+      "test_id": "TIR-037",
+      "classification": "environment / permissions",
+      "status": "RECHECK_PENDING",
+      "evidence": "Error: B234 authentication circuit open; no further live login attempted",
+      "next_action": "Rate-limit or safety circuit; no original assertion executed; pace authorized access, preserve circuit."
+    },
+    {
+      "test_id": "TIR-038",
+      "classification": "environment / permissions",
+      "status": "RECHECK_PENDING",
+      "evidence": "Error: B234 authentication circuit open; no further live login attempted",
+      "next_action": "Rate-limit or safety circuit; no original assertion executed; pace authorized access, preserve circuit."
+    },
+    {
+      "test_id": "TIR-042",
+      "classification": "environment / permissions",
+      "status": "RECHECK_PENDING",
+      "evidence": "Error: B234 authentication circuit open; no further live login attempted",
+      "next_action": "Rate-limit or safety circuit; no original assertion executed; pace authorized access, preserve circuit."
+    },
+    {
+      "test_id": "TIR-043",
+      "classification": "environment / permissions",
+      "status": "RECHECK_PENDING",
+      "evidence": "Error: B234 authentication circuit open; no further live login attempted",
+      "next_action": "Rate-limit or safety circuit; no original assertion executed; pace authorized access, preserve circuit."
+    },
+    {
+      "test_id": "TIR-047",
+      "classification": "environment / permissions",
+      "status": "RECHECK_PENDING",
+      "evidence": "Error: B234 authentication circuit open; no further live login attempted",
+      "next_action": "Rate-limit or safety circuit; no original assertion executed; pace authorized access, preserve circuit."
+    },
+    {
+      "test_id": "TIR-048",
+      "classification": "environment / permissions",
+      "status": "RECHECK_PENDING",
+      "evidence": "Error: B234 authentication circuit open; no further live login attempted",
+      "next_action": "Rate-limit or safety circuit; no original assertion executed; pace authorized access, preserve circuit."
+    },
+    {
+      "test_id": "TIR-049",
+      "classification": "environment / permissions",
+      "status": "RECHECK_PENDING",
+      "evidence": "Error: B234 authentication circuit open; no further live login attempted",
+      "next_action": "Rate-limit or safety circuit; no original assertion executed; pace authorized access, preserve circuit."
+    },
+    {
+      "test_id": "TIR-050",
+      "classification": "environment / permissions",
+      "status": "RECHECK_PENDING",
+      "evidence": "Error: B234 authentication circuit open; no further live login attempted",
+      "next_action": "Rate-limit or safety circuit; no original assertion executed; pace authorized access, preserve circuit."
+    }
+  ]
+}

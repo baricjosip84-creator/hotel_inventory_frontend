@@ -1,13 +1,13 @@
 import fs from 'node:fs';
 import assert from 'node:assert/strict';
-const m=JSON.parse(fs.readFileSync('original-suite-approved.json','utf8')),p=JSON.parse(fs.readFileSync('batch-236-review.json','utf8'));
+const m=JSON.parse(fs.readFileSync('original-suite-approved.json','utf8')),p=JSON.parse(fs.readFileSync('batch-236-r2-review.json','utf8'));
 const g=m.approved_groups.BULK_SAFE_17,all=g.entries.flatMap(e=>e.ids),sort=x=>[...x].sort();
 assert.deepEqual(sort(all),sort(p.selected));
 assert.equal(process.env.PW_BASE_URL,'https://hotel-inventory-frontend-mauve.vercel.app');
 assert.equal(process.env.PW_LIVE_ORIGINAL_READONLY,'YES');assert.equal(process.env.PW_ORIGINAL_SUITE_GROUP,'BULK_SAFE_17');
 const file='batch-236-live-access.json';
 if(process.argv.includes('--init')){
- fs.writeFileSync(file,JSON.stringify({status:'AUTH_NOT_VERIFIED',pages:p.pages,access:{},runnable:[],blocked:all},null,2));process.exit(0);
+ fs.writeFileSync(file,JSON.stringify({status:'AUTH_NOT_VERIFIED',expectedCount:p.selected.length,pages:p.pages,access:{},runnable:[],blocked:all},null,2));process.exit(0);
 }
 assert(process.argv.includes('--apply'));
 const report=JSON.parse(fs.readFileSync(file,'utf8'));

@@ -72,9 +72,14 @@ const fixtures=[
  ['inventory-requisitions/inventory-requisitions.spec.ts','setupReq',{},'/inventory-requisitions','/inventory-requisitions/options',null,null],
  ['inventory-capabilities/inventory-capabilities.spec.ts','openCapabilities',{},'/inventory-capabilities','/inventory-capabilities/overview',null,null],
  ['inventory-capabilities/inventory-capabilities-workflows.spec.ts','load',{},'/inventory-capabilities','/inventory-capabilities/overview',null,null],
- ['inventory-capabilities/inventory-capabilities-advanced.spec.ts','load',{stockUnavailable:true},'/inventory-capabilities','/stock',null,null]
+ ['inventory-capabilities/inventory-capabilities-advanced.spec.ts','load',{stockUnavailable:true},'/inventory-capabilities','/stock',null,null],
+ ['execution-requests/execution-requests.spec.ts','openRequests',{replyByPath:{'/execution-requests/options':{products:[]}}},'/execution-requests','/execution-requests/options',null,null,{products:[]}],
+ ['inventory-capabilities/inventory-capabilities-workflows.spec.ts','load',{failGet:'/webhook-events'},'/inventory-capabilities','/inventory-capabilities/webhook-events',null,null,{error:{code:'FIXTURE_UNAVAILABLE',message:'Fixture request unavailable'}},503],
+ ['inventory-capabilities/inventory-capabilities-workflows.spec.ts','load',{failAction:'/test'},'/inventory-capabilities','/inventory-capabilities/overview','/inventory-capabilities/webhooks/fixture/test',409,null,200,{error:{code:'VERSION_CONFLICT',message:'Fixture request rejected'}}],
+ ['inventory-capabilities/inventory-capabilities-workflows.spec.ts','load',{failGet:'webhooks-cursor-invalid'},'/inventory-capabilities','/inventory-capabilities/webhooks?cursor=expired',null,null,{error:{code:'WEBHOOK_CURSOR_INVALID',message:'Invalid cursor'}},400],
+ ['inventory-capabilities/inventory-capabilities.spec.ts','openCapabilities',{failCreateClient:true},'/inventory-capabilities','/inventory-capabilities/overview','/inventory-capabilities/api-clients',409,null,200,{error:{code:'API_CLIENT_ALREADY_EXISTS',message:'Fixture duplicate key'}}]
 ];
-for(const [file,helper,opts,target,get,post,postStatus] of fixtures){
+for(const [file,helper,opts,target,get,post,postStatus,getBody,getStatus,postBody] of fixtures){
  const src=fs.readFileSync('tests/tenant/'+file,'utf8'),exports={},routes=[];
  let opened=false;
  const test=()=>{};test.describe=()=>{};test.beforeEach=()=>{};
@@ -101,8 +106,9 @@ for(const [file,helper,opts,target,get,post,postStatus] of fixtures){
   return undefined;
  };
  assert.equal(await request('GET',target,true),undefined,'document must never be mocked');
- assert.equal((await request('GET',get))?.status,opts.stockUnavailable?503:200,file+' fixture GET');
- if(post)assert.equal((await request('POST',post))?.status,postStatus,file+' fixture POST');
+ const got=await request('GET',get);assert.equal(got?.status,getStatus??(opts.stockUnavailable?503:200),file+' fixture GET');
+ if(getBody)assert.equal(JSON.stringify(got.data),JSON.stringify(getBody),file+' fixture GET payload');
+ if(post){const sent=await request('POST',post);assert.equal(sent?.status,postStatus,file+' fixture POST');if(postBody)assert.equal(JSON.stringify(sent.data),JSON.stringify(postBody),file+' fixture POST error envelope');}
  console.log('PASS B236 actual fixture '+file+' '+helper);
 }
 // Target authentication recovery: real page marker required; 429 stops and
@@ -116,4 +122,4 @@ for(const [route,mode,expected] of [['/execution-tasks','ok',true],['/execution-
  assert.equal(renewed,mode==='login'?1:0);assert.equal(stopped,mode==='429'?1:0);
 }
 assert.equal(plan.count,150);
-console.log('PASS B236: 7 representative fixture helpers and 4 genuine-target recovery scenarios (offline simulation).');
+console.log('PASS B236 R2: 12 representative fixture contracts and 4 genuine-target recovery scenarios (offline simulation).');

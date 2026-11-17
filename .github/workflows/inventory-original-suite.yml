@@ -180,10 +180,11 @@ jobs:
           node scripts/check-b235-r3-permission-fixture.mjs
           node scripts/prepare-batch-235-r4-runtime.mjs
           node scripts/check-b235-r4-target-recovery.mjs
-      - name: Prepare Batch 236 - new unresolved tenant originals
+      - name: Prepare Batch 236 R2 - unresolved tenant originals
         if: ${{ inputs.group == 'BULK_SAFE_17' }}
         run: |
           node scripts/prepare-batch-236-runtime.mjs
+          node scripts/prepare-batch-236-r2-runtime.mjs
           node scripts/check-batch-236-fixtures.mjs
       - name: Install browser for reviewed existing tests
         if: ${{ inputs.group != 'DISCOVER_ALL' }}
@@ -260,7 +261,7 @@ jobs:
       - name: Require exact Batch 235 actual pass results
         if: ${{ always() && inputs.group == 'BULK_SAFE_16' }}
         run: node scripts/check-batch-235-executed.mjs
-      - name: Batch 236 - guarded access and 150 unresolved originals
+      - name: Batch 236 R2 - guarded access and 64 unresolved originals
         if: ${{ inputs.group == 'BULK_SAFE_17' }}
         env:
           PW_LIVE_ORIGINAL_READONLY: 'YES'
