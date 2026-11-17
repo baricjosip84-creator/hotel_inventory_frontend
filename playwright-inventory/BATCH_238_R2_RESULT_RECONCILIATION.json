@@ -1,0 +1,40 @@
+{
+  "date": "2026-11-17",
+  "log": "logs_119366187086.zip",
+  "previous_confirmed": 2652,
+  "new_actual_pass": [
+    "TET-034",
+    "TET-035",
+    "TET-036",
+    "TET-037",
+    "TET-038",
+    "TET-039",
+    "TET-040",
+    "TET-045",
+    "TICAP-093",
+    "TICAP-094",
+    "TICAP-110",
+    "TICAP-132",
+    "TLOG-008",
+    "TLOG-009",
+    "TLOG-012",
+    "TSES-019",
+    "TSES-037",
+    "TSES-041"
+  ],
+  "failed_unverified": [
+    "TICAP-095",
+    "TICAP-155"
+  ],
+  "now_confirmed": 2670,
+  "tenant_total": 2938,
+  "now_remaining": 268,
+  "role_dependent_still_gated": 214,
+  "selected_for_recheck": [
+    "TICAP-095",
+    "TICAP-155"
+  ],
+  "selection_group": "BULK_SAFE_17",
+  "source": "Actual Playwright output and B238 strict checker, not assumed green",
+  "offline_verification_status": "Prepared; must preflight after bundle construction"
+}

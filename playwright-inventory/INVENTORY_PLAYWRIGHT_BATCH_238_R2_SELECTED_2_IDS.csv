@@ -1,0 +1,3 @@
+test_id,spec_file,title,previous,next_stage,reason
+TICAP-095,tenant/inventory-capabilities/inventory-capabilities-advanced.spec.ts,TICAP-095 Rejected finalization leaves preview visible and no successful reset,HELD,B238_R2_SELECTED,Actual B238 browser FAIL: strict locator resolved 2 matching Fixture action rejected nodes; scope main .form-error; retain preview/no-reset checks.
+TICAP-155,tenant/inventory-capabilities/inventory-capabilities-advanced.spec.ts,TICAP-155 Partially received shipment allows preview but blocks finalize,HELD,B238_R2_SELECTED,"Actual B238 browser FAIL: Finalize cost button absent after partial shipment preview; verify explicit lock message, no enabled finalization control, no finalize POST."

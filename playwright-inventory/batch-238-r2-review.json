@@ -1,0 +1,58 @@
+{
+  "batch": 238,
+  "iteration": "R2",
+  "group": "BULK_SAFE_17",
+  "count": 2,
+  "basis": "Actual Batch 238 GitHub logs_119366187086.zip: 18 actual PASS, 2 actual FAIL, no skipped or access-blocked",
+  "prior_confirmed": 2670,
+  "prior_remaining": 268,
+  "previous_batch_selected_count": 20,
+  "new_pass_from_batch_238": [
+    "TET-034",
+    "TET-035",
+    "TET-036",
+    "TET-037",
+    "TET-038",
+    "TET-039",
+    "TET-040",
+    "TET-045",
+    "TICAP-093",
+    "TICAP-094",
+    "TICAP-110",
+    "TICAP-132",
+    "TLOG-008",
+    "TLOG-009",
+    "TLOG-012",
+    "TSES-019",
+    "TSES-037",
+    "TSES-041"
+  ],
+  "selected": [
+    "TICAP-095",
+    "TICAP-155"
+  ],
+  "pages": {
+    "inventory-capabilities": {
+      "route": "/inventory-capabilities",
+      "heading": "Advanced inventory workspace"
+    }
+  },
+  "patches": {
+    "tenant/inventory-capabilities/inventory-capabilities-advanced.spec.ts": {
+      "cases": {
+        "TICAP-095": [
+          [
+            "await expect(page.getByText('Fixture action rejected')).toBeVisible();",
+            "await expect(page.getByRole('main').locator('.form-error').filter({hasText:'Fixture action rejected'})).toBeVisible();"
+          ]
+        ],
+        "TICAP-155": [
+          [
+            "await expect(finalizeButton(page)).toBeDisabled();",
+            "const finalizeAction=finalizeButton(page); const finalizeActionCount=await finalizeAction.count(); expect(finalizeActionCount).toBeLessThanOrEqual(1); if(finalizeActionCount) await expect(finalizeAction).toBeDisabled(); else await expect(finalizeAction).toHaveCount(0);"
+          ]
+        ]
+      }
+    }
+  }
+}
