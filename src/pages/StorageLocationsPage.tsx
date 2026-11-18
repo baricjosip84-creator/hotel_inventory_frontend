@@ -4,6 +4,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useSearchParams } from 'react-router';
 import { apiRequest } from '../lib/api';
 import { getStorageLocationMutationErrorMessage } from '../lib/storageLocationMutationError';
+import { storageLocationDirectoryFilterParams, storageLocationDirectoryShowAllParams } from '../lib/storageLocationDirectoryUrl';
 import { getCurrentAccessRoleLabel, getRoleCapabilities, hasPermission, TENANT_PERMISSIONS } from '../lib/permissions';
 import { scrollToFormSection } from '../lib/scrollToForm';
 import { InventoryCsvImportPanel } from '../components/imports/InventoryCsvImportPanel';
@@ -241,6 +242,8 @@ export default function StorageLocationsPage() {
     return [...zoneMap.values()].sort((left, right) => left.localeCompare(right));
   }, [locations]);
 
+  const requestedLocation = requestedLocationId ? locations.find((location) => location.id === requestedLocationId) || null : null;
+
   const filteredLocations = useMemo(() => {
     if (requestedLocationId) return locations.filter((location) => location.id === requestedLocationId);
     const normalizedSearch = normalizeText(search);
@@ -293,7 +296,7 @@ export default function StorageLocationsPage() {
   const locationListUnavailable = locationsQuery.isLoading || locationsQuery.isError;
   const writeBusy = createMutation.isPending || updateMutation.isPending || retireMutation.isPending;
   const inputDisabled = writeBusy || !canManageStorageLocations;
-  const filtersActive = Boolean(search.trim() || zoneFilter.trim());
+  const filtersActive = Boolean(requestedLocationId || search.trim() || zoneFilter.trim());
 
   const handleSubmit = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -370,21 +373,24 @@ export default function StorageLocationsPage() {
     retireMutation.mutate({ id: location.id, version: location.version });
   };
 
-  const updateDirectoryFilters = (nextSearch: string, nextZone: string) => {
-    setSearch(nextSearch);
-    setZoneFilter(nextZone);
-    setSearchParams((currentParams) => {
-      const nextParams = new URLSearchParams(currentParams);
-      nextParams.delete('location_id');
-      if (nextSearch.trim()) nextParams.set('search', nextSearch.trim());
-      else nextParams.delete('search');
-      if (nextZone.trim()) nextParams.set('zone', nextZone.trim());
-      else nextParams.delete('zone');
-      return nextParams;
-    }, { replace: true });
+  const changeDirectorySearch = (value: string) => {
+    setSearch(value);
+    setSearchParams((currentParams) => storageLocationDirectoryFilterParams(currentParams, value, zoneFilter), { replace: true });
   };
 
-  const clearFilters = () => updateDirectoryFilters('', '');
+  const changeDirectoryZone = (value: string) => {
+    setZoneFilter(value);
+    setSearchParams((currentParams) => storageLocationDirectoryFilterParams(currentParams, search, value), { replace: true });
+  };
+
+  const clearFilters = () => {
+    setSearch('');
+    setZoneFilter('');
+    // Clear an exact linked location as well: otherwise the list stays pinned.
+    if (requestedLocationId || searchParams.has('search') || searchParams.has('zone')) {
+      setSearchParams((currentParams) => storageLocationDirectoryShowAllParams(currentParams), { replace: true });
+    }
+  };
 
   const clearTransientFeedback = () => {
     setFormError(null);
@@ -610,7 +616,7 @@ export default function StorageLocationsPage() {
               type="search"
               placeholder={ui("Name or storage condition")}
               value={search}
-              onChange={(event) => updateDirectoryFilters(event.target.value, zoneFilter)}
+              onChange={(event) => changeDirectorySearch(event.target.value)}
               style={styles.searchInput}
               maxLength={255}
             />
@@ -621,7 +627,7 @@ export default function StorageLocationsPage() {
             <select
               id="storage-location-zone-filter"
               value={zoneFilter}
-              onChange={(event) => updateDirectoryFilters(search, event.target.value)}
+              onChange={(event) => changeDirectoryZone(event.target.value)}
               style={styles.searchInput}
             >
               <option value="">{ui("All zones")}</option>
@@ -633,7 +639,9 @@ export default function StorageLocationsPage() {
         {!locationListUnavailable ? (
           <div style={styles.listMetaRow}>
             <span style={styles.resultCount}>
-              {filtersActive
+              {requestedLocationId
+                ? `${ui('Location')}: ${requestedLocation?.name || ui('Storage location not found')} — ${formatLocalizedNumber(filteredLocations.length, locale)} ${ui('of')} ${formatLocalizedNumber(locations.length, locale)}`
+                : filtersActive
                 ? `${formatLocalizedNumber(filteredLocations.length, locale)} ${ui('of')} ${formatLocalizedNumber(locations.length, locale)} ${ui('active locations match.')}`
                 : `${formatLocalizedNumber(locations.length, locale)} ${ui('active')} ${ui(locations.length === 1 ? 'location' : 'locations')}.`}
             </span>
@@ -661,7 +669,9 @@ export default function StorageLocationsPage() {
         {!locationsQuery.isLoading && !locationsQuery.isError ? (
           filteredLocations.length === 0 ? (
             <div className="app-empty-state" style={styles.stateBox}>
-              {locations.length === 0
+              {requestedLocationId
+                ? ui('Storage location not found')
+                : locations.length === 0
                 ? ui("No active storage locations exist yet.")
                 : ui("No storage locations match the current search and zone filters.")}
             </div>

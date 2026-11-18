@@ -1,12 +1,21 @@
-// Fail closed if a full source replacement would overwrite unrelated existing edits.
-import assert from 'node:assert/strict';import fs from 'node:fs';import crypto from 'node:crypto';import {execFileSync} from 'node:child_process';import {fileURLToPath} from 'node:url';
+// Verify the correction against the exact Git history, without writing source.
+import assert from 'node:assert/strict';
+import fs from 'node:fs';
+import crypto from 'node:crypto';
+import {execFileSync} from 'node:child_process';
+import {fileURLToPath} from 'node:url';
 const root=fileURLToPath(new URL('../../',import.meta.url));
 const p=JSON.parse(fs.readFileSync(new URL('../batch-244-review.json',import.meta.url),'utf8'));
-const git=(...args)=>execFileSync('git',args,{cwd:root,encoding:'utf8',maxBuffer:4*1024*1024}),sha=s=>crypto.createHash('sha256').update(s.replace(/\r\n/g,'\n')).digest('hex');
+const git=(...args)=>execFileSync('git',args,{cwd:root,encoding:'utf8',maxBuffer:8*1024*1024});
+const sha=s=>crypto.createHash('sha256').update(s.replace(/\r\n/g,'\n')).digest('hex');
 assert.equal(Object.keys(p.source_files).length,3);
-for(const [file,review] of Object.entries(p.source_files)){
- const s=fs.readFileSync(root+file,'utf8');assert.equal(sha(s),review.after,'Unexpected repaired source: '+file);assert.equal(sha(git('show','HEAD:'+file)),review.after);
- const last=git('log','-1','--format=%H','--',file).trim();assert.match(last,/^[a-f0-9]{40}$/);
- assert.equal(sha(git('show',last+'^:'+file)),review.before,'Previous committed source differs from reviewed baseline for '+file+'; STOP and request an exact patch.');
- console.log('PASS B244 source diff: '+file+' matches reviewed before and after.');
+assert.match(p.recovery_failed_commit,/^[a-f0-9]{40}$/);
+git('merge-base','--is-ancestor',p.recovery_failed_commit,'HEAD');
+for(const [file,r] of Object.entries(p.source_files)){
+  assert.equal(git('rev-parse',r.bad_commit+'^').trim(),r.original_parent);
+  assert.equal(sha(git('show',r.original_parent+':'+file)),r.before,'Original committed source mismatch: '+file);
+  assert.equal(sha(git('show',r.bad_commit+':'+file)),r.bad_after,'Original B244 commit mismatch: '+file);
+  assert.equal(sha(git('show','HEAD:'+file)),r.after,'Corrected committed source mismatch: '+file);
+  assert.equal(sha(fs.readFileSync(root+file,'utf8')),r.after,'Corrected working source mismatch: '+file);
+  console.log('PASS B244 R2 exact source history: '+file);
 }

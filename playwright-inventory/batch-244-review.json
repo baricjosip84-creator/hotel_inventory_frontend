@@ -52,17 +52,27 @@
   },
   "source_files": {
     "src/pages/InsightsPage.tsx": {
-      "before": "1bf99b162da2ac86561553ad6f6a3403656c6260ecb77acc38e65c21d5910c51",
-      "after": "8abdaadcd4818952160b1bd13575a068968616d87a6c13dc0a32626426b8a770"
+      "before": "727bafd64516c3a7d7fe27673dee4e939d660d3ce558ece37f639740cec73401",
+      "after": "600715673272898671e911877c22f424e506c3d96d2138901c0c05d16eb4cc12",
+      "bad_commit": "ba7b70a4d4a718f4ce563df4737a971f5a966869",
+      "original_parent": "f6bc5ee860b00f394e2278bb7915616be516d19d",
+      "bad_after": "8abdaadcd4818952160b1bd13575a068968616d87a6c13dc0a32626426b8a770"
     },
     "src/pages/ReliabilityCommandPage.tsx": {
       "before": "1a6c23a209e175b4e2e897f312933922601b7a44df144d718e2ff819bdc20a3a",
-      "after": "911be1a34678b547362e468d72d6967dc91532ff349e7c877b739fff280ac8bb"
+      "after": "911be1a34678b547362e468d72d6967dc91532ff349e7c877b739fff280ac8bb",
+      "bad_commit": "ba7b70a4d4a718f4ce563df4737a971f5a966869",
+      "original_parent": "f6bc5ee860b00f394e2278bb7915616be516d19d",
+      "bad_after": "911be1a34678b547362e468d72d6967dc91532ff349e7c877b739fff280ac8bb"
     },
     "src/pages/StorageLocationsPage.tsx": {
-      "before": "0baa07bed7bca624f5962535698dda45904509c4d683c8eea220adeedebbd4b0",
-      "after": "4b89798ea7c61419b77ff7ae0e54cc1c1e7c8fdafcb45c2cebca7573d61bc325"
+      "before": "b2d96e4189d7b7635a335bd5b4a57167643e35791bf98c504f672f259d6ee122",
+      "after": "6b5cf3808686ac7fe3234dabf63ab131a248c641d46bf9ee78058a0db32d98ce",
+      "bad_commit": "ba7b70a4d4a718f4ce563df4737a971f5a966869",
+      "original_parent": "f6bc5ee860b00f394e2278bb7915616be516d19d",
+      "bad_after": "4b89798ea7c61419b77ff7ae0e54cc1c1e7c8fdafcb45c2cebca7573d61bc325"
     }
   },
-  "basis": "Three application fixes; exact prior runtime specs retained. Five held original cases selected; no new tests, no role substitutions."
+  "basis": "R2: exact pre-B244 source recovered from committed GitHub file downloads; restore newer Insights and Storage Locations functionality, apply minimal reviewed edits, retain byte-identical Reliability repair. Original five tests unchanged.",
+  "recovery_failed_commit": "ba7b70a4d4a718f4ce563df4737a971f5a966869"
 }

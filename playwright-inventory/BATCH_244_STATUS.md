@@ -1,39 +1,19 @@
-# Inventory Management App — Playwright Batch 244
+# Inventory Management App — Batch 244 R2
 
-18 November 2026
+18 November 2026. Corrected release; supersedes initial Batch 244 source package.
 
-## Confirmed status
+- The frontend build validation stopped at `check:feed-anomaly-freshness`. The initial Batch 244 artifact replaced two pages with stale versions and lost previously implemented functionality. Exact pre-Batch-244 source was recovered from commit `f6bc5ee860b00f394e2278bb7915616be516d19d`, parent of `ba7b70a4d4a718f4ce563df4737a971f5a966869`.
+- Insights: preserve meaningful outbound anomaly tier filtering and current page source; clear the stale supplier detail on user filter changes while retaining URL restoration guards.
+- Storage Locations: preserve the existing deep-link helper, remove the pin on explicit directory filter changes using current URL parameters, and clear all directory restrictions while preserving unrelated parameters.
+- Reliability Command: exact pre-B244 source plus atomic filter reset equals the already-committed Batch 244 file byte-for-byte. It does not need replacement.
+- Existing original-suite workflow and five selected original tests remain unchanged. The source guard now checks the actual original commit, failed commit, and corrected commit hashes.
+- Local validation: exact existing feed freshness/anomaly regression script 27/27 PASS; focused parser and filter behavior checks performed before packaging. Complete frontend CI/build and five live Playwright outcomes remain pending.
+- Confirmed counts remain 2,686/2,938 tenant (91.42%) and 2,686/9,900 overall (27.13%). No new PASS credited. Five originals remain pending: TINS-024, TRC-009, TRC-048, TSL-040, TSL-045.
 
-- Batch 243 R2: user confirmed deployment and strict GitHub Actions workflow GREEN. TSN-042 is closed; raw B243 log was not provided. No other IDs are promoted.
-- Tenant: 2,686 / 2,938 PASS (91.42%); 252 unresolved, including 214 canonical role-gated IDs and 38 additional held IDs.
-- Entire original suite: 2,686 / 9,900 PASS (27.13%); 7,214 unresolved. The tenant total is a subset of 9,900, not an additional suite.
-- Batch 244 selects five held originals. If all five are confirmed green: tenant 2,691 / 2,938, 247 unresolved; overall 2,691 / 9,900. Do not update confirmed totals until actual workflow evidence arrives.
+## GitHub UI only
 
-## Application fixes
+1. Extract this changed-files ZIP into the frontend repository root, overwrite matching files, then commit/push using the normal process.
+2. Wait for Frontend Validation and Vercel to turn green.
+3. Actions → **Inventory - original 9900 Playwright suite** → **Run workflow** → group **BULK_SAFE_17** → confirmation **ORIGINALTESTS** → **Run workflow**.
 
-| Page | Original test IDs | Repair |
-|---|---|---|
-| Insights | TINS-024 | Clear stale selected supplier when filter change resets pagination; retain deep-link restoration guard. |
-| Reliability Command | TRC-009, TRC-048 | Clear three query-backed filters in one router update, preserving unrelated parameters. |
-| Storage Locations | TSL-040, TSL-045 | Explicit directory filtering leaves pinned location mode, maintaining search/zone and unrelated URL parameters. Initial exact location links remain unchanged. |
-
-The application source is based on the recovered surgical-fix-184 frontend archive. The workflow checks the prior committed file hash and repaired file hash for each replacement to prevent accepting unrelated source overwrite. If the source differs, stop; do not credit tests or blindly bypass the guard. The application replacements must be deployed before browser testing. The five original runtime specs have not been altered.
-
-## Offline checks completed
-
-- Three TSX sources parsed: PASS.
-- Runtime manifest selection: exact five distinct original IDs, original B237 prepared source SHA-256 verified, no confirmed IDs repeated: PASS.
-- Extracted atomic filter callbacks tested with URLSearchParams: PASS (defaults cleared; unrelated query preserved; stored search/zone retained; location pin removed; clear resets directory).
-- Insights source reset guard inspection: PASS.
-- Workflow YAML parsed and six JavaScript helper syntax checks: PASS.
-- Strict result checker: positive fixture accepted; missing, blocked, skipped, duplicate, retry/flaky outcomes rejected. Synthetic reports are NOT browser evidence.
-- Issues tracker preserves all 663 records and updates the six affected entries.
-
-## Run (same GitHub UI workflow)
-
-1. Extract ZIP into existing repository root, preserving paths. Commit/push changed and added files. Before deploying, inspect the three source file diffs: only the reviewed changes above should appear.
-2. Wait for Vercel GREEN.
-3. GitHub Actions → **Inventory - original 9900 Playwright suite** → Run workflow → group **BULK_SAFE_17**, confirmation **ORIGINALTESTS** → Run workflow.
-4. Expected acceptance: **B244 ACTUAL PASS 5/5** and green workflow. No terminal commands or manual UI tests needed. Return workflow logs if it fails.
-
-Confirmed IDs and cumulative issues must remain preserved. Role-gated originals must not be treated as passed using administrator substitution or mocked permissions.
+Expected: `B244 ACTUAL PASS 5/5`. Do not use the recovery workflow. No manual commands or new workflow required.
