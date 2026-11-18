@@ -198,7 +198,7 @@ jobs:
         run: |
           node scripts/check-batch-244-source-diff.mjs
           node scripts/check-batch-244-url-actions.mjs
-      - name: Prepare Batch 245 tenant closure (all eligible outstanding originals)
+      - name: Prepare Batch 246 corrected original tests
         if: ${{ inputs.group == 'BULK_SAFE_17' }}
         run: |
           node scripts/prepare-batch-237-runtime.mjs
@@ -213,6 +213,7 @@ jobs:
           node scripts/prepare-batch-243-runtime.mjs
           node scripts/prepare-batch-244-runtime.mjs
           node scripts/prepare-batch-245-runtime.mjs
+          node scripts/prepare-batch-246-runtime.mjs
       - name: List the approved original test IDs before execution
         if: ${{ inputs.group != 'DISCOVER_ALL' }}
         env:
@@ -285,20 +286,59 @@ jobs:
       - name: Require exact Batch 235 actual pass results
         if: ${{ always() && inputs.group == 'BULK_SAFE_16' }}
         run: node scripts/check-batch-235-executed.mjs
-      - name: Batch 245 - guarded outstanding tenant originals
+      - name: Batch 246 - corrected guarded originals
         if: ${{ inputs.group == 'BULK_SAFE_17' }}
         env:
           PW_LIVE_ORIGINAL_READONLY: 'YES'
           PW_ORIGINAL_SUITE_GROUP: ${{ inputs.group }}
           PW_TENANT_EMAIL: ${{ secrets.E2E_EMAIL }}
           PW_TENANT_PASSWORD: ${{ secrets.E2E_PASSWORD }}
-          PLAYWRIGHT_JSON_OUTPUT_FILE: batch-245-results.json
-        run: node scripts/run-batch-245.mjs
-      - name: Require exact Batch 245 actual pass results and report tenant closure
+          PLAYWRIGHT_JSON_OUTPUT_FILE: batch-246-results.json
+        run: node scripts/run-batch-246.mjs
+      - name: Require exact Batch 246 actual pass results and report tenant closure
         if: ${{ always() && inputs.group == 'BULK_SAFE_17' }}
-        run: node scripts/check-batch-245-executed.mjs
+        run: node scripts/check-batch-246-executed.mjs
       # No auth snapshots, traces, videos, screenshots, or artifacts uploaded.
       - name: Require every Batch 233 original to have been eligible (no false green)
         if: ${{ always() && inputs.group == 'BULK_SAFE_14' }}
         run: node -e "const fs=require('node:fs');const f='./batch-233-live-access.json';if(!fs.existsSync(f)){console.error('B233 stopped before access report initialization; all 500 are unverified');process.exit(1)}const s=require(f);if(s.status!=='PROBED'||s.blocked.length){console.error('Access-unverified original IDs:',s.blocked.length);process.exit(1)}"
       # One explicitly approved bulk group or single legacy group per run; no unrestricted 9,900-test live execution.
+
+  b246-current-source-fix:
+    if: ${{ inputs.group == 'BULK_SAFE_17' && inputs.confirmation == 'ORIGINALTESTS' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    env:
+      CI: 'true'
+      VERCEL: '1'
+      VITE_API_BASE_URL: /api
+    steps:
+      - name: Checkout exact current frontend source
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+      - name: Generate three narrowly scoped frontend fixes
+        run: node playwright-inventory/scripts/build-b246-application-fix.mjs
+      - name: Install application dependencies
+        run: npm ci
+      - name: Verify targeted application contracts
+        run: |
+          npm run check:sessions-page-hardening
+          npm run check:tenant-products-multilingual
+          npm run check:tenant-shipments-page-completion-multilingual
+          npm run typecheck:deployment-readiness
+          npm run build
+      - name: Package verified current-source files
+        run: |
+          cd "$RUNNER_TEMP/b246-app-fix"
+          zip -q -r "$RUNNER_TEMP/B246_APPLICATION_CHANGED_FILES_ONLY.zip" .
+      - name: Save verified frontend changes
+        uses: actions/upload-artifact@v4
+        with:
+          name: B246-APPLICATION-CHANGED-FILES
+          path: ${{ runner.temp }}/B246_APPLICATION_CHANGED_FILES_ONLY.zip
+          if-no-files-found: error
