@@ -193,12 +193,11 @@ jobs:
       - name: Verify Batch 236 R3 locator and confirmation behavior without network
         if: ${{ inputs.group == 'BULK_SAFE_17' }}
         run: node scripts/check-batch-236-r3-locators.mjs
-      - name: Verify Batch 243 committed scanner source repair (no source writes)
+      - name: Verify Batch 244 committed source repairs (no source writes)
         if: ${{ inputs.group == 'BULK_SAFE_17' }}
         run: |
-          node scripts/check-batch-243-source-diff.mjs
-          node scripts/apply-batch-243-scanner-fix.mjs --check
-      - name: Prepare Batch 243 (original scanner task recheck after source repair)
+          node scripts/check-batch-244-source-diff.mjs
+      - name: Prepare Batch 244 (five original tests after source repairs)
         if: ${{ inputs.group == 'BULK_SAFE_17' }}
         run: |
           node scripts/prepare-batch-237-runtime.mjs
@@ -211,6 +210,7 @@ jobs:
           node scripts/prepare-batch-241-r2-runtime.mjs
           node scripts/prepare-batch-242-runtime.mjs
           node scripts/prepare-batch-243-runtime.mjs
+          node scripts/prepare-batch-244-runtime.mjs
       - name: List the approved original test IDs before execution
         if: ${{ inputs.group != 'DISCOVER_ALL' }}
         env:
@@ -283,18 +283,18 @@ jobs:
       - name: Require exact Batch 235 actual pass results
         if: ${{ always() && inputs.group == 'BULK_SAFE_16' }}
         run: node scripts/check-batch-235-executed.mjs
-      - name: Batch 243 - guarded original scanner task verification
+      - name: Batch 244 - guarded original filter and detail verification
         if: ${{ inputs.group == 'BULK_SAFE_17' }}
         env:
           PW_LIVE_ORIGINAL_READONLY: 'YES'
           PW_ORIGINAL_SUITE_GROUP: ${{ inputs.group }}
           PW_TENANT_EMAIL: ${{ secrets.E2E_EMAIL }}
           PW_TENANT_PASSWORD: ${{ secrets.E2E_PASSWORD }}
-          PLAYWRIGHT_JSON_OUTPUT_FILE: batch-243-results.json
-        run: node scripts/run-batch-243.mjs
-      - name: Require exact Batch 243 actual pass result
+          PLAYWRIGHT_JSON_OUTPUT_FILE: batch-244-results.json
+        run: node scripts/run-batch-244.mjs
+      - name: Require all five Batch 244 actual pass results
         if: ${{ always() && inputs.group == 'BULK_SAFE_17' }}
-        run: node scripts/check-batch-243-executed.mjs
+        run: node scripts/check-batch-244-executed.mjs
       # No auth snapshots, traces, videos, screenshots, or artifacts uploaded.
       - name: Require every Batch 233 original to have been eligible (no false green)
         if: ${{ always() && inputs.group == 'BULK_SAFE_14' }}

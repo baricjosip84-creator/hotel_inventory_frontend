@@ -1,0 +1,68 @@
+{
+  "batch": 244,
+  "group": "BULK_SAFE_17",
+  "count": 5,
+  "confirmed_before": 2686,
+  "remaining_before": 252,
+  "prior_batch_user_confirmed_green": [
+    "TSN-042"
+  ],
+  "selected": [
+    "TINS-024",
+    "TRC-009",
+    "TRC-048",
+    "TSL-040",
+    "TSL-045"
+  ],
+  "pages": {
+    "insights": {
+      "route": "/insights",
+      "heading": "Insights workspace"
+    },
+    "reliability-command": {
+      "route": "/reliability-command",
+      "heading": "Review current pressure, safety checks, and the manual follow-up path"
+    },
+    "storage-locations": {
+      "route": "/storage-locations",
+      "heading": "Storage location workspace"
+    }
+  },
+  "spec_files": {
+    "tenant/insights/insights.spec.ts": {
+      "selected": [
+        "TINS-024"
+      ],
+      "sha256": "14dec95cf46e8971352758d8ece5527b579e98a357e55ce3e164005f5679daab"
+    },
+    "tenant/reliability-command/reliability-command.spec.ts": {
+      "selected": [
+        "TRC-009",
+        "TRC-048"
+      ],
+      "sha256": "0a97676447f7954301eccce51b8c38b3d737edfde4dab5b67679449b398937ca"
+    },
+    "tenant/storage-locations/storage-locations.spec.ts": {
+      "selected": [
+        "TSL-040",
+        "TSL-045"
+      ],
+      "sha256": "c75b1cfaebac6cfee66863bcbb08c1460955c3e60445249d029ae7e130f772ff"
+    }
+  },
+  "source_files": {
+    "src/pages/InsightsPage.tsx": {
+      "before": "1bf99b162da2ac86561553ad6f6a3403656c6260ecb77acc38e65c21d5910c51",
+      "after": "8abdaadcd4818952160b1bd13575a068968616d87a6c13dc0a32626426b8a770"
+    },
+    "src/pages/ReliabilityCommandPage.tsx": {
+      "before": "1a6c23a209e175b4e2e897f312933922601b7a44df144d718e2ff819bdc20a3a",
+      "after": "911be1a34678b547362e468d72d6967dc91532ff349e7c877b739fff280ac8bb"
+    },
+    "src/pages/StorageLocationsPage.tsx": {
+      "before": "0baa07bed7bca624f5962535698dda45904509c4d683c8eea220adeedebbd4b0",
+      "after": "4b89798ea7c61419b77ff7ae0e54cc1c1e7c8fdafcb45c2cebca7573d61bc325"
+    }
+  },
+  "basis": "Three application fixes; exact prior runtime specs retained. Five held original cases selected; no new tests, no role substitutions."
+}

@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { Link } from 'react-router';
+import { Link, useSearchParams } from 'react-router';
 import { useQuery } from '@tanstack/react-query';
 import { ApiError, apiRequest } from '../lib/api';
 import { useAppTranslation } from '../i18n/I18nContext';
@@ -329,6 +329,7 @@ async function fetchReliabilityCommand(filters: {
 
 export default function ReliabilityCommandPage() {
   const { locale, ui } = useAppTranslation();
+  const [, setSearchParams] = useSearchParams();
   const [view, setView] = useState<ReliabilityView>('posture');
   const [readiness, setReadiness] = useRouteQueryState<ReadinessFilter>({
     paramName: 'readiness',
@@ -397,9 +398,13 @@ export default function ReliabilityCommandPage() {
   const activeFilterCount = Number(readiness !== 'watch') + Number(severity !== 'all') + Number(limit !== '9');
 
   const clearFilters = () => {
-    setReadiness('watch');
-    setSeverity('all');
-    setLimit('9');
+    setSearchParams((currentParams) => {
+      const nextParams = new URLSearchParams(currentParams);
+      nextParams.delete('readiness');
+      nextParams.delete('severity');
+      nextParams.delete('limit');
+      return nextParams;
+    }, { replace: true });
   };
 
   return (

@@ -1,5 +1,3 @@
-import { isUnusualOutboundTier } from '../lib/feedAnomalyDisplay';
-import { csvSpreadsheetCell } from '../lib/spreadsheetCsv';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { CSSProperties } from 'react';
 import { Link, useSearchParams } from 'react-router';
@@ -319,6 +317,11 @@ function normalizeLookbackDays(value: string | null): number {
   return [14, 30, 60, 90].includes(parsed) ? parsed : 30;
 }
 
+function neutralizeSpreadsheetFormula(value: unknown): string {
+  const normalized = value === null || value === undefined ? '' : String(value);
+  return /^[=+\-@]/.test(normalized) ? `'${normalized}` : normalized;
+}
+
 function toReadableError(error: unknown, unknownErrorLabel: string): string {
   if (error instanceof ApiError) {
     return error.message;
@@ -345,7 +348,8 @@ function toNumber(value: number | string | null | undefined): number {
 }
 
 function escapeCsv(value: unknown): string {
-  return csvSpreadsheetCell(value, true);
+  const normalized = neutralizeSpreadsheetFormula(value);
+  return `"${normalized.replace(/"/g, '""')}"`;
 }
 
 function downloadCsv(filename: string, rows: Array<Array<unknown>>) {
@@ -703,7 +707,7 @@ export default function InsightsPage() {
   const formatReadableStatus = useCallback((value: string | null | undefined) => {
     if (!value) return ui('Not available');
     const known: Record<string, string> = {
-      critical: 'Critical', high: 'High', medium: 'Medium', low: 'Low', healthy: 'Healthy', watch: 'Watch', stable: 'Stable',
+      critical: 'Critical', high: 'High', medium: 'Medium', low: 'Low', healthy: 'Healthy', watch: 'Watch',
       excellent: 'Excellent', strong: 'Strong', risk: 'Risk', unrated: 'Unrated', rated: 'Rated',
       blocked: 'Blocked', needs_review: 'Needs review', ready_for_controlled_use: 'Ready for controlled use', monitor_only: 'Monitor only',
       insufficient_history: 'Not enough history'
@@ -741,11 +745,6 @@ export default function InsightsPage() {
   const [supplierPage, setSupplierPage] = useState(() => normalizeSupplierPage(searchParams.get('supplier_page')));
   const [supplierPageSize, setSupplierPageSize] = useState<SupplierPageSize>(() => normalizeSupplierPageSize(searchParams.get('supplier_page_size')));
   const [selectedSupplierId, setSelectedSupplierId] = useState<string | null>(() => searchParams.get('supplier_id'));
-  const [showAllDepletionEvidence, setShowAllDepletionEvidence] = useState(false);
-  const [depletionReviewPage, setDepletionReviewPage] = useState(0);
-  const [selectedDepletionStockId, setSelectedDepletionStockId] = useState<string | null>(null);
-  const [reorderReviewPage, setReorderReviewPage] = useState(0);
-  const [selectedReorderProductId, setSelectedReorderProductId] = useState<string | null>(null);
   const lastSyncedSearchParamsRef = useRef(searchParams.toString());
   const hasMountedSupplierFilterResetRef = useRef(false);
   const skipNextSupplierFilterResetRef = useRef(false);
@@ -873,41 +872,14 @@ export default function InsightsPage() {
     [reorderQuery.data?.rows]
   );
 
-  // FT044: show all recommended products in an eight-row paginated queue.
-  // Selection is bound to the visible page, including after API refreshes.
-  const reorderReviewPageCount = Math.max(1, Math.ceil(activeReorderRows.length / 8));
-  const visibleReorderReviewPage = Math.min(reorderReviewPage, reorderReviewPageCount - 1);
-  const visibleReorderReviewRows = activeReorderRows.slice(visibleReorderReviewPage * 8, (visibleReorderReviewPage + 1) * 8);
-  const selectedReorderRow = visibleReorderReviewRows.find((row) => row.product_id === selectedReorderProductId)
-    ?? visibleReorderReviewRows[0] ?? null;
-
-  // The endpoint returns ALL stock observations. Only live warning tiers
-  // belong in the user-facing depletion queue; stable rows are not warnings.
   const prioritizedDepletionRows = useMemo(
-    () => [...(depletionRiskQuery.data?.rows ?? [])]
-      .filter((row) => ['watch', 'high', 'critical'].includes(row.risk_tier.toLowerCase()))
-      .sort((a, b) =>
-        toNumber(b.risk_score) - toNumber(a.risk_score)
-        || a.product_name.localeCompare(b.product_name)
-        || a.storage_location_name.localeCompare(b.storage_location_name)
-      ),
+    () => [...(depletionRiskQuery.data?.rows ?? [])].sort((a, b) =>
+      toNumber(b.risk_score) - toNumber(a.risk_score)
+      || a.product_name.localeCompare(b.product_name)
+      || a.storage_location_name.localeCompare(b.storage_location_name)
+    ),
     [depletionRiskQuery.data?.rows]
   );
-
-  const rootCauseRowsForDisplay = useMemo(
-    () => (depletionRootCauseQuery.data?.rows ?? [])
-      .filter((row) => showAllDepletionEvidence || row.production_safety.requires_human_review),
-    [depletionRootCauseQuery.data?.rows, showAllDepletionEvidence]
-  );
-
-  // Keep the queue compact: eight rows per page, one detail panel at a time.
-  // Selection always resolves within the visible page, so an old selection
-  // cannot silently display an unrelated or hidden stock record.
-  const depletionReviewPageCount = Math.max(1, Math.ceil(rootCauseRowsForDisplay.length / 8));
-  const visibleDepletionReviewPage = Math.min(depletionReviewPage, depletionReviewPageCount - 1);
-  const visibleDepletionReviewRows = rootCauseRowsForDisplay.slice(visibleDepletionReviewPage * 8, (visibleDepletionReviewPage + 1) * 8);
-  const selectedDepletionRow = visibleDepletionReviewRows.find((row) => row.stock_id === selectedDepletionStockId)
-    ?? visibleDepletionReviewRows[0] ?? null;
 
   const allInsightQueries = [
     depletionRiskQuery,
@@ -926,7 +898,7 @@ export default function InsightsPage() {
     .some((query) => query.isError);
 
   const unusualAnomalyRows = useMemo(
-    () => (anomaliesQuery.data?.rows ?? []).filter((row) => isUnusualOutboundTier(row.anomaly_tier)),
+    () => (anomaliesQuery.data?.rows ?? []).filter((row) => String(row.anomaly_tier || '').toLowerCase() !== 'normal'),
     [anomaliesQuery.data?.rows]
   );
 
@@ -1185,6 +1157,7 @@ export default function InsightsPage() {
     }
 
     setSupplierPage(1);
+    setSelectedSupplierId(null);
   }, [supplierRiskFilter, supplierSearch, supplierSort, supplierTierFilter, supplierPageSize]);
 
   useEffect(() => {
@@ -2262,7 +2235,7 @@ export default function InsightsPage() {
                 </article>
               ))}
             </div>
-          ) : !depletionRiskQuery.isLoading && !depletionRiskQuery.isError ? <div className="app-empty-state" style={styles.infoState}>{ui("No active depletion risk")}</div> : null}
+          ) : !depletionRiskQuery.isLoading && !depletionRiskQuery.isError ? <div className="app-empty-state" style={styles.infoState}>{ui("No depletion risk rows returned.")}</div> : null}
         </Section>
 
         <Section title={ui("Why stock is under pressure")} subtitle={ui("Explains the current stock and recent usage factors that operators should verify before replenishment decisions.")} iconPath="/stock">
@@ -2275,92 +2248,43 @@ export default function InsightsPage() {
                 <span>{ui('{count} need human review').replace('{count}', formatNumber(depletionRootCauseQuery.data.summary.rows_requiring_human_review, 0))}</span>
                 <span>{ui('Read-only: {value}').replace('{value}', depletionRootCauseQuery.data.safety_contract.read_only ? ui('Yes') : ui('No'))}</span>
               </div>
-              {!rootCauseRowsForDisplay.length ? (
-                <div className="app-empty-state" style={styles.infoState}>{ui('No stock rows require review.')}</div>
-              ) : null}
-              {depletionRootCauseQuery.data.rows.some((row) => !row.production_safety.requires_human_review) ? (
-                <button type="button" className="insights-secondary-button" style={styles.secondaryButton} onClick={() => {
-                  setShowAllDepletionEvidence((current) => !current);
-                  setDepletionReviewPage(0);
-                  setSelectedDepletionStockId(null);
-                }}>
-                  {showAllDepletionEvidence ? ui('Show only rows needing review') : ui('Show all reviewed stock rows')}
-                </button>
-              ) : null}
-              {rootCauseRowsForDisplay.length ? (
-                <div className="insights-stock-review-layout">
-                  <div className="insights-stock-review-queue" role="group" aria-label={ui('Reviewed stock rows')}>
-                    <div className="insights-stock-review-header" aria-hidden="true">
-                      <span>{ui('Product')}</span><span>{ui('Location')}</span><span>{ui('Concern')}</span><span>{ui('Details')}</span>
-                    </div>
-                    {visibleDepletionReviewRows.map((row) => (
-                      <button
-                        key={`${row.stock_id}-root-cause-row`}
-                        type="button"
-                        className={`insights-stock-review-row${selectedDepletionRow?.stock_id === row.stock_id ? ' insights-stock-review-row--selected' : ''}`}
-                        aria-pressed={selectedDepletionRow?.stock_id === row.stock_id}
-                        aria-label={ui('Review {product} at {location}').replace('{product}', row.product_name).replace('{location}', row.storage_location_name)}
-                        onClick={() => setSelectedDepletionStockId(row.stock_id)}
-                      >
-                        <span className="insights-stock-review-product">{row.product_name}</span>
-                        <span className="insights-stock-review-location">{row.storage_location_name}</span>
-                        <span className="insights-stock-review-risk">
-                          {formatReadableStatus(row.highest_factor_severity)} · {formatNumber(row.risk_score, 0)}
-                        </span>
-                        <span className="insights-stock-review-view">{ui('Details')}</span>
-                      </button>
-                    ))}
-                    {depletionReviewPageCount > 1 ? (
-                      <div className="insights-stock-review-pagination">
-                        <button type="button" className="app-button app-button--secondary" disabled={visibleDepletionReviewPage === 0} onClick={() => {
-                          setDepletionReviewPage((page) => Math.max(0, page - 1));
-                          setSelectedDepletionStockId(null);
-                        }}>{ui('Previous')}</button>
-                        <span>{ui('Page {page} of {total}').replace('{page}', String(visibleDepletionReviewPage + 1)).replace('{total}', String(depletionReviewPageCount))}</span>
-                        <button type="button" className="app-button app-button--secondary" disabled={visibleDepletionReviewPage >= depletionReviewPageCount - 1} onClick={() => {
-                          setDepletionReviewPage((page) => Math.min(depletionReviewPageCount - 1, page + 1));
-                          setSelectedDepletionStockId(null);
-                        }}>{ui('Next')}</button>
-                      </div>
-                    ) : null}
+              {depletionRootCauseQuery.data.rows.slice(0, 8).map((row) => (
+                <article key={`${row.stock_id}-root-cause`} className="insights-item-card insights-item-card--root-cause" style={styles.itemCard}>
+                  <div style={styles.itemTitle}>{row.product_name}</div>
+                  <div style={styles.itemMeta}>
+                    {ui('{location} · Highest concern {severity} · Risk {score} / {tier}').replace('{location}', row.storage_location_name).replace('{severity}', formatReadableStatus(row.highest_factor_severity)).replace('{score}', formatNumber(row.risk_score, 0)).replace('{tier}', formatReadableStatus(row.risk_tier))}
                   </div>
-                  {selectedDepletionRow ? (
-                    <article key={`${selectedDepletionRow.stock_id}-root-cause-detail`} className="insights-stock-review-detail" aria-label={ui('Selected stock review')}>
-                      <div style={styles.itemTitle}>{selectedDepletionRow.product_name}</div>
-                      <div style={styles.itemMeta}>
-                        {ui('{location} · Highest concern {severity} · Risk {score} / {tier}').replace('{location}', selectedDepletionRow.storage_location_name).replace('{severity}', formatReadableStatus(selectedDepletionRow.highest_factor_severity)).replace('{score}', formatNumber(selectedDepletionRow.risk_score, 0)).replace('{tier}', formatReadableStatus(selectedDepletionRow.risk_tier))}
-                      </div>
-                      <div style={styles.riskFlagDetailList}>
-                        {selectedDepletionRow.root_cause_factors.slice(0, 3).map((factor) => {
-                          const localizedFactor = localizeDepletionRootCauseFactor(factor, selectedDepletionRow, ui, formatNumber);
-                          return (
-                            <div key={`${selectedDepletionRow.stock_id}-${factor.code}`} style={styles.riskFlagDetailItem}>
-                              <span style={factor.severity === 'critical' || factor.severity === 'high' ? styles.riskFlagHigh : factor.severity === 'medium' ? styles.riskFlagMedium : styles.riskFlagLow}>
-                                {formatReadableStatus(factor.severity)}
-                              </span>
-                              <div>
-                                <div style={styles.itemTitle}>{localizedFactor.label}</div>
-                                <div style={styles.itemText}>{localizedFactor.detail}</div>
-                              </div>
+                  <div style={styles.riskFlagDetailList}>
+                    {row.root_cause_factors.slice(0, 3).map((factor) => (
+                      (() => {
+                        const localizedFactor = localizeDepletionRootCauseFactor(factor, row, ui, formatNumber);
+                        return (
+                          <div key={`${row.stock_id}-${factor.code}`} style={styles.riskFlagDetailItem}>
+                            <span style={factor.severity === 'critical' || factor.severity === 'high' ? styles.riskFlagHigh : factor.severity === 'medium' ? styles.riskFlagMedium : styles.riskFlagLow}>
+                              {formatReadableStatus(factor.severity)}
+                            </span>
+                            <div>
+                              <div style={styles.itemTitle}>{localizedFactor.label}</div>
+                              <div style={styles.itemText}>{localizedFactor.detail}</div>
                             </div>
-                          );
-                        })}
-                      </div>
-                      <div className="insights-recommended-action-panel" style={styles.recommendedActionPanel}>
-                        <div style={styles.itemTitle}>{ui('Investigation steps')}</div>
-                        <ul style={styles.compactList}>
-                          {selectedDepletionRow.recommended_investigation_steps.slice(0, 3).map((step) => (
-                            <li key={`${selectedDepletionRow.stock_id}-${step}`} style={styles.itemText}>{localizeInsightsSystemText(step, ui)}</li>
-                          ))}
-                        </ul>
-                      </div>
-                      {canOpenStock ? (
-                        <Link to={`/stock?stock_id=${encodeURIComponent(selectedDepletionRow.stock_id)}`} style={styles.inlineActionLink}>{ui('Open in Stock')}</Link>
-                      ) : null}
-                    </article>
+                          </div>
+                        );
+                      })()
+                    ))}
+                  </div>
+                  <div className="insights-recommended-action-panel" style={styles.recommendedActionPanel}>
+                    <div style={styles.itemTitle}>{ui("Investigation steps")}</div>
+                    <ul style={styles.compactList}>
+                      {row.recommended_investigation_steps.slice(0, 3).map((step) => (
+                        <li key={`${row.stock_id}-${step}`} style={styles.itemText}>{localizeInsightsSystemText(step, ui)}</li>
+                      ))}
+                    </ul>
+                  </div>
+                  {canOpenStock ? (
+                    <Link to={`/stock?stock_id=${encodeURIComponent(row.stock_id)}`} style={styles.inlineActionLink}>{ui("Open in Stock")}</Link>
                   ) : null}
-                </div>
-              ) : null}
+                </article>
+              ))}
             </div>
           ) : !depletionRootCauseQuery.isLoading && !depletionRootCauseQuery.isError ? <div className="app-empty-state" style={styles.infoState}>{ui("No depletion root-cause review returned.")}</div> : null}
         </Section>
@@ -2369,54 +2293,19 @@ export default function InsightsPage() {
           {reorderQuery.isLoading ? <div className="app-empty-state" style={styles.infoState}>{ui("Loading reorder recommendations...")}</div> : null}
           {reorderQuery.isError ? <div className="app-error-state" style={styles.errorState}>{toReadableError(reorderQuery.error, ui('Unknown error'))}</div> : null}
           {activeReorderRows.length ? (
-            <div className="insights-stock-review-layout">
-              <div className="insights-stock-review-queue" role="group" aria-label={ui('Reorder recommendations queue')}>
-                <div className="insights-stock-review-header insights-reorder-review-columns" aria-hidden="true">
-                  <span>{ui('Product')}</span><span>{ui('Urgency')}</span><span>{ui('Reorder quantity')}</span><span>{ui('Details')}</span>
-                </div>
-                {visibleReorderReviewRows.map((row) => (
-                  <button
-                    key={`${row.product_id}-reorder-row`}
-                    type="button"
-                    className={`insights-stock-review-row insights-reorder-review-columns${selectedReorderRow?.product_id === row.product_id ? ' insights-stock-review-row--selected' : ''}`}
-                    aria-pressed={selectedReorderRow?.product_id === row.product_id}
-                    aria-label={ui('Review reorder for {product}').replace('{product}', row.product_name)}
-                    onClick={() => setSelectedReorderProductId(row.product_id)}
-                  >
-                    <span className="insights-stock-review-product">{row.product_name}</span>
-                    <span className="insights-stock-review-risk">{formatReadableStatus(row.urgency)}</span>
-                    <span className="insights-stock-review-location">{formatNumber(row.recommended_reorder_quantity)}</span>
-                    <span className="insights-stock-review-view">{ui('Details')}</span>
-                  </button>
-                ))}
-                {reorderReviewPageCount > 1 ? (
-                  <div className="insights-stock-review-pagination">
-                    <button type="button" className="app-button app-button--secondary" disabled={visibleReorderReviewPage === 0} onClick={() => {
-                      setReorderReviewPage((page) => Math.max(0, page - 1));
-                      setSelectedReorderProductId(null);
-                    }}>{ui('Previous')}</button>
-                    <span>{ui('Page {page} of {total}').replace('{page}', String(visibleReorderReviewPage + 1)).replace('{total}', String(reorderReviewPageCount))}</span>
-                    <button type="button" className="app-button app-button--secondary" disabled={visibleReorderReviewPage >= reorderReviewPageCount - 1} onClick={() => {
-                      setReorderReviewPage((page) => Math.min(reorderReviewPageCount - 1, page + 1));
-                      setSelectedReorderProductId(null);
-                    }}>{ui('Next')}</button>
-                  </div>
-                ) : null}
-              </div>
-              {selectedReorderRow ? (
-                <article key={`${selectedReorderRow.product_id}-reorder-detail`} className="insights-stock-review-detail" aria-label={ui('Selected reorder recommendation')}>
-                  <div style={styles.itemTitle}>{selectedReorderRow.product_name}</div>
-                  <div style={styles.itemMeta}>
-                    {ui('Urgency {urgency} · Reorder {quantity}').replace('{urgency}', formatReadableStatus(selectedReorderRow.urgency)).replace('{quantity}', formatNumber(selectedReorderRow.recommended_reorder_quantity))}
-                  </div>
+            <div style={styles.list}>
+              {activeReorderRows.slice(0, 8).map((row) => (
+                <article key={row.product_id} className="insights-item-card" style={styles.itemCard}>
+                  <div style={styles.itemTitle}>{row.product_name}</div>
+                  <div style={styles.itemMeta}>{ui('Urgency {urgency} · Reorder {quantity}').replace('{urgency}', formatReadableStatus(row.urgency)).replace('{quantity}', formatNumber(row.recommended_reorder_quantity))}</div>
                   <div style={styles.itemText}>
-                    {ui('Current {current} · Min {min} · Avg Daily Usage {usage}').replace('{current}', formatNumber(selectedReorderRow.current_quantity)).replace('{min}', formatNumber(selectedReorderRow.min_stock)).replace('{usage}', formatNumber(selectedReorderRow.average_daily_usage))}
+                    {ui('Current {current} · Min {min} · Avg Daily Usage {usage}').replace('{current}', formatNumber(row.current_quantity)).replace('{min}', formatNumber(row.min_stock)).replace('{usage}', formatNumber(row.average_daily_usage))}
                   </div>
                   {canOpenProducts ? (
-                    <Link to={`/products?product_id=${encodeURIComponent(selectedReorderRow.product_id)}`} style={styles.inlineActionLink}>{ui('Open product')}</Link>
+                    <Link to={`/products?product_id=${encodeURIComponent(row.product_id)}`} style={styles.inlineActionLink}>{ui("Open product")}</Link>
                   ) : null}
                 </article>
-              ) : null}
+              ))}
             </div>
           ) : !reorderQuery.isLoading && !reorderQuery.isError ? <div className="app-empty-state" style={styles.infoState}>{ui("No active reorder quantity is currently recommended.")}</div> : null}
         </Section>
@@ -2509,7 +2398,7 @@ export default function InsightsPage() {
               </article>
             ))}
           </div>
-        ) : !anomaliesQuery.isLoading && !anomaliesQuery.isError ? <div className="app-empty-state" style={styles.infoState}>{ui("No unusual outbound activity detected.")}</div> : null}
+        ) : !anomaliesQuery.isLoading && !anomaliesQuery.isError ? <div className="app-empty-state" style={styles.infoState}>{ui("No anomaly rows returned.")}</div> : null}
       </Section>
     </div>
   );
