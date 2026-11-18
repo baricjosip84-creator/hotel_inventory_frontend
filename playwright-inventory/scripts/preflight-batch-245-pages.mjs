@@ -1,0 +1,25 @@
+import fs from 'node:fs';import assert from 'node:assert/strict';
+const m=JSON.parse(fs.readFileSync('original-suite-approved.json','utf8'));
+const p=JSON.parse(fs.readFileSync('batch-245-review.json','utf8'));
+const all=m.approved_groups.BULK_SAFE_17.entries.flatMap(e=>e.ids),sort=x=>[...x].sort();
+const source=JSON.parse(fs.readFileSync('batch-245-source-review.json','utf8'));
+assert.deepEqual(sort(all),sort(source.approved));
+assert.deepEqual(sort([...all,...source.sourceUnverified]),sort(p.selected));
+assert.equal(process.env.PW_BASE_URL,'https://hotel-inventory-frontend-mauve.vercel.app');
+assert.equal(process.env.PW_LIVE_ORIGINAL_READONLY,'YES');
+assert.equal(process.env.PW_ORIGINAL_SUITE_GROUP,'BULK_SAFE_17');
+const file='batch-245-live-access.json';
+if(process.argv.includes('--init')){fs.writeFileSync(file,JSON.stringify({status:'AUTH_NOT_VERIFIED',expectedCount:19,pages:p.pages,access:{},runnable:[],blocked:p.selected,sourceUnverified:source.sourceUnverified},null,2));process.exit(0);}
+assert(process.argv.includes('--apply'));
+const report=JSON.parse(fs.readFileSync(file,'utf8'));assert.equal(report.status,'PROBED');
+assert.deepEqual(sort(Object.keys(report.access)),sort(Object.keys(p.pages)));
+assert(Object.values(report.access).every(x=>['ACCESS_CONFIRMED','ACCESS_UNVERIFIED'].includes(x)));
+const runnable=all.filter(id=>{const f=Object.keys(p.spec_files).find(f=>p.spec_files[f].selected.includes(id));assert(f);return report.access[f.split('/')[1]]==='ACCESS_CONFIRMED';});
+const blocked=p.selected.filter(id=>!runnable.includes(id));
+fs.writeFileSync(file,JSON.stringify({...report,runnable,blocked},null,2));
+const g=m.approved_groups.BULK_SAFE_17;
+g.entries=g.entries.filter(e=>report.access[e.file.split('/')[1]]==='ACCESS_CONFIRMED');
+fs.writeFileSync('original-suite-approved.json',JSON.stringify(m,null,2)+'\n');
+console.log('B245 authorized runnable '+runnable.length+'; access unverified '+blocked.length);
+if(blocked.length)console.log('ACCESS_UNVERIFIED B245 IDs: '+blocked.join(','));
+assert(runnable.length>0,'No authorized route available');

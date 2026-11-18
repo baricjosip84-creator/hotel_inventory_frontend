@@ -198,7 +198,7 @@ jobs:
         run: |
           node scripts/check-batch-244-source-diff.mjs
           node scripts/check-batch-244-url-actions.mjs
-      - name: Prepare Batch 244 R4 (three remaining original tests)
+      - name: Prepare Batch 245 tenant closure (all eligible outstanding originals)
         if: ${{ inputs.group == 'BULK_SAFE_17' }}
         run: |
           node scripts/prepare-batch-237-runtime.mjs
@@ -212,6 +212,7 @@ jobs:
           node scripts/prepare-batch-242-runtime.mjs
           node scripts/prepare-batch-243-runtime.mjs
           node scripts/prepare-batch-244-runtime.mjs
+          node scripts/prepare-batch-245-runtime.mjs
       - name: List the approved original test IDs before execution
         if: ${{ inputs.group != 'DISCOVER_ALL' }}
         env:
@@ -284,18 +285,18 @@ jobs:
       - name: Require exact Batch 235 actual pass results
         if: ${{ always() && inputs.group == 'BULK_SAFE_16' }}
         run: node scripts/check-batch-235-executed.mjs
-      - name: Batch 244 - guarded original filter and detail verification
+      - name: Batch 245 - guarded outstanding tenant originals
         if: ${{ inputs.group == 'BULK_SAFE_17' }}
         env:
           PW_LIVE_ORIGINAL_READONLY: 'YES'
           PW_ORIGINAL_SUITE_GROUP: ${{ inputs.group }}
           PW_TENANT_EMAIL: ${{ secrets.E2E_EMAIL }}
           PW_TENANT_PASSWORD: ${{ secrets.E2E_PASSWORD }}
-          PLAYWRIGHT_JSON_OUTPUT_FILE: batch-244-results.json
-        run: node scripts/run-batch-244.mjs
-      - name: Require all three Batch 244 R4 actual pass results
+          PLAYWRIGHT_JSON_OUTPUT_FILE: batch-245-results.json
+        run: node scripts/run-batch-245.mjs
+      - name: Require exact Batch 245 actual pass results and report tenant closure
         if: ${{ always() && inputs.group == 'BULK_SAFE_17' }}
-        run: node scripts/check-batch-244-executed.mjs
+        run: node scripts/check-batch-245-executed.mjs
       # No auth snapshots, traces, videos, screenshots, or artifacts uploaded.
       - name: Require every Batch 233 original to have been eligible (no false green)
         if: ${{ always() && inputs.group == 'BULK_SAFE_14' }}

@@ -1,0 +1,249 @@
+{
+  "batch": 245,
+  "group": "BULK_SAFE_17",
+  "count": 19,
+  "confirmed_before": 2691,
+  "remaining_before": 247,
+  "blocked_before": 228,
+  "selected": [
+    "TICAP-035",
+    "TICAP-051",
+    "TICAP-143",
+    "TINT-038",
+    "TINT-040",
+    "TINT-043",
+    "TINT-044",
+    "TIR-020",
+    "TIU-032",
+    "TPROD-034",
+    "TPROD-035",
+    "TPROD-065",
+    "TPROD-071",
+    "TPROD-076",
+    "TPROD-077",
+    "TSES-039",
+    "TSH-069",
+    "TST-038",
+    "TST-039"
+  ],
+  "previous_batch_green": [
+    "TINS-024",
+    "TSL-040",
+    "TSL-045"
+  ],
+  "pages": {
+    "inventory-capabilities": {
+      "route": "/inventory-capabilities",
+      "marker": "Advanced inventory workspace",
+      "kind": "heading"
+    },
+    "intelligence-review": {
+      "route": "/intelligence-review",
+      "marker": "Intelligence Review",
+      "kind": "heading"
+    },
+    "inventory-requisitions": {
+      "route": "/inventory-requisitions",
+      "marker": "Internal stock requests",
+      "kind": "text"
+    },
+    "inventory-usage": {
+      "route": "/inventory-usage",
+      "marker": "Inventory usage ledger",
+      "kind": "heading"
+    },
+    "products": {
+      "route": "/products",
+      "marker": "Product workspace",
+      "kind": "heading"
+    },
+    "sessions": {
+      "route": "/sessions",
+      "marker": "Sessions",
+      "kind": "heading"
+    },
+    "shipments": {
+      "route": "/shipments",
+      "marker": "Inbound shipments",
+      "kind": "heading"
+    },
+    "stock": {
+      "route": "/stock",
+      "marker": "Stock workspace",
+      "kind": "text"
+    }
+  },
+  "spec_files": {
+    "tenant/inventory-capabilities/inventory-capabilities.spec.ts": {
+      "selected": [
+        "TICAP-035",
+        "TICAP-143"
+      ]
+    },
+    "tenant/inventory-capabilities/inventory-capabilities-workflows.spec.ts": {
+      "selected": [
+        "TICAP-051"
+      ]
+    },
+    "tenant/intelligence-review/intelligence-review.spec.ts": {
+      "selected": [
+        "TINT-038",
+        "TINT-040",
+        "TINT-043",
+        "TINT-044"
+      ]
+    },
+    "tenant/inventory-requisitions/inventory-requisitions.spec.ts": {
+      "selected": [
+        "TIR-020"
+      ]
+    },
+    "tenant/inventory-usage/inventory-usage.spec.ts": {
+      "selected": [
+        "TIU-032"
+      ]
+    },
+    "tenant/products/products.spec.ts": {
+      "selected": [
+        "TPROD-034",
+        "TPROD-035",
+        "TPROD-065",
+        "TPROD-071",
+        "TPROD-076",
+        "TPROD-077"
+      ]
+    },
+    "tenant/sessions/sessions-batch33.spec.ts": {
+      "selected": [
+        "TSES-039"
+      ]
+    },
+    "tenant/shipments/shipments.spec.ts": {
+      "selected": [
+        "TSH-069"
+      ]
+    },
+    "tenant/stock/stock.spec.ts": {
+      "selected": [
+        "TST-038",
+        "TST-039"
+      ]
+    }
+  },
+  "tests": {
+    "TICAP-035": {
+      "file": "tenant/inventory-capabilities/inventory-capabilities.spec.ts",
+      "allowed_body_sha256": [
+        "9cf6d3b73404d19e3b196f0a97822b4305cf46d20ebb9e38886cc3ac76d1069a"
+      ]
+    },
+    "TICAP-051": {
+      "file": "tenant/inventory-capabilities/inventory-capabilities-workflows.spec.ts",
+      "allowed_body_sha256": [
+        "b4e64481d8e5c2280a0f5fc08407071dbc25dc6986511c7350f7292e01e2a8eb"
+      ]
+    },
+    "TICAP-143": {
+      "file": "tenant/inventory-capabilities/inventory-capabilities.spec.ts",
+      "allowed_body_sha256": [
+        "097dd0966d4118ebfb1f4542c867f14d755247926663731c1a80411fb2e7e559"
+      ]
+    },
+    "TINT-038": {
+      "file": "tenant/intelligence-review/intelligence-review.spec.ts",
+      "allowed_body_sha256": [
+        "988837baf915ca6c1974cc7932256bd9a673c3bff69335d117136a80887c22b4"
+      ]
+    },
+    "TINT-040": {
+      "file": "tenant/intelligence-review/intelligence-review.spec.ts",
+      "allowed_body_sha256": [
+        "c53e8976869034e589220cc3e395ba79536017b89b5aa126a294d1391ab6c319"
+      ]
+    },
+    "TINT-043": {
+      "file": "tenant/intelligence-review/intelligence-review.spec.ts",
+      "allowed_body_sha256": [
+        "cdffe73ecc12678353bd85beff177880f124ef70c1d5b0c57cb0678881a2f9c5"
+      ]
+    },
+    "TINT-044": {
+      "file": "tenant/intelligence-review/intelligence-review.spec.ts",
+      "allowed_body_sha256": [
+        "214d22ad58778e374be0f6e2507671567c7375a6e3d33844a1a319f46f35d660"
+      ]
+    },
+    "TIR-020": {
+      "file": "tenant/inventory-requisitions/inventory-requisitions.spec.ts",
+      "allowed_body_sha256": [
+        "8603d62f69dc24e36a68958388aa3705e95063f2769c69d6277eca8fd3da94c7"
+      ]
+    },
+    "TIU-032": {
+      "file": "tenant/inventory-usage/inventory-usage.spec.ts",
+      "allowed_body_sha256": [
+        "9805a306adb6d9f136bda1f75c2b49a0505a31120286f27831b2220791c43b11"
+      ]
+    },
+    "TPROD-034": {
+      "file": "tenant/products/products.spec.ts",
+      "allowed_body_sha256": [
+        "f989358ad47062e95a581c55512193e0193256d9f6a9f9945d8c041730286805"
+      ]
+    },
+    "TPROD-035": {
+      "file": "tenant/products/products.spec.ts",
+      "allowed_body_sha256": [
+        "b174e2bdf535063bab17d9af0b282b662c1276ace927ec6b156010d89a2c2474"
+      ]
+    },
+    "TPROD-065": {
+      "file": "tenant/products/products.spec.ts",
+      "allowed_body_sha256": [
+        "f9d4329d9d425fd0c22d917837240a277d4a172c80b95e7d7adac3dc3251abfb"
+      ]
+    },
+    "TPROD-071": {
+      "file": "tenant/products/products.spec.ts",
+      "allowed_body_sha256": [
+        "e6d037c37b1d96a57e56af4d8b2eea1477f68ef2a1bf1bd85de016846e986d32"
+      ]
+    },
+    "TPROD-076": {
+      "file": "tenant/products/products.spec.ts",
+      "allowed_body_sha256": [
+        "d8e312f24b7a4737548540e16f8db12e2b360611d80a884cbc8b748804e8ba50"
+      ]
+    },
+    "TPROD-077": {
+      "file": "tenant/products/products.spec.ts",
+      "allowed_body_sha256": [
+        "82853e77c18bae40ae5204bb8d3b90238193293694d98cec5620a362ff3f77e4"
+      ]
+    },
+    "TSES-039": {
+      "file": "tenant/sessions/sessions-batch33.spec.ts",
+      "allowed_body_sha256": [
+        "1b09d54c459dbafafbc7d1d7653aa44676b47eb0aff06e69754832a319108042"
+      ]
+    },
+    "TSH-069": {
+      "file": "tenant/shipments/shipments.spec.ts",
+      "allowed_body_sha256": [
+        "e763a8c96b4386cbafd41e42481fd0b169f76bd9ca8c1e12647a639ee2363f37"
+      ]
+    },
+    "TST-038": {
+      "file": "tenant/stock/stock.spec.ts",
+      "allowed_body_sha256": [
+        "a0df9659e6ba4c4b2886864377e540297b1bcc829c4f1ccad9d12cf6de6bb8f7"
+      ]
+    },
+    "TST-039": {
+      "file": "tenant/stock/stock.spec.ts",
+      "allowed_body_sha256": [
+        "9a2091281e9bef0372029afd791bd8df371d53c32ad1d242037c4931a2006ede"
+      ]
+    }
+  }
+}
