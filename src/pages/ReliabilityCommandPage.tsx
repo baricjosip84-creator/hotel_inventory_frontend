@@ -329,7 +329,7 @@ async function fetchReliabilityCommand(filters: {
 
 export default function ReliabilityCommandPage() {
   const { locale, ui } = useAppTranslation();
-  const [, setSearchParams] = useSearchParams();
+  const [searchParams, setSearchParams] = useSearchParams();
   const [view, setView] = useState<ReliabilityView>('posture');
   const [readiness, setReadiness] = useRouteQueryState<ReadinessFilter>({
     paramName: 'readiness',
@@ -398,6 +398,11 @@ export default function ReliabilityCommandPage() {
   const activeFilterCount = Number(readiness !== 'watch') + Number(severity !== 'all') + Number(limit !== '9');
 
   const clearFilters = () => {
+    // When only the result limit is present, the existing one-filter setter is sufficient.
+    if (!searchParams.has('readiness') && !searchParams.has('severity')) {
+      setLimit('9');
+      return;
+    }
     setSearchParams((currentParams) => {
       const nextParams = new URLSearchParams(currentParams);
       nextParams.delete('readiness');

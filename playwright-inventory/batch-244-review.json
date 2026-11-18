@@ -60,19 +60,26 @@
     },
     "src/pages/ReliabilityCommandPage.tsx": {
       "before": "1a6c23a209e175b4e2e897f312933922601b7a44df144d718e2ff819bdc20a3a",
-      "after": "911be1a34678b547362e468d72d6967dc91532ff349e7c877b739fff280ac8bb",
+      "after": "0ab25ede11c66d176a690f0863300d269e4a3d5e1b9c6ea1ed5ab9865bc6d8cd",
       "bad_commit": "ba7b70a4d4a718f4ce563df4737a971f5a966869",
       "original_parent": "f6bc5ee860b00f394e2278bb7915616be516d19d",
       "bad_after": "911be1a34678b547362e468d72d6967dc91532ff349e7c877b739fff280ac8bb"
     },
     "src/pages/StorageLocationsPage.tsx": {
       "before": "b2d96e4189d7b7635a335bd5b4a57167643e35791bf98c504f672f259d6ee122",
-      "after": "6b5cf3808686ac7fe3234dabf63ab131a248c641d46bf9ee78058a0db32d98ce",
+      "after": "b2d96e4189d7b7635a335bd5b4a57167643e35791bf98c504f672f259d6ee122",
       "bad_commit": "ba7b70a4d4a718f4ce563df4737a971f5a966869",
       "original_parent": "f6bc5ee860b00f394e2278bb7915616be516d19d",
       "bad_after": "4b89798ea7c61419b77ff7ae0e54cc1c1e7c8fdafcb45c2cebca7573d61bc325"
     }
   },
-  "basis": "R2: exact pre-B244 source recovered from committed GitHub file downloads; restore newer Insights and Storage Locations functionality, apply minimal reviewed edits, retain byte-identical Reliability repair. Original five tests unchanged.",
-  "recovery_failed_commit": "ba7b70a4d4a718f4ce563df4737a971f5a966869"
+  "basis": "R3: exact pre-B244 Storage Locations file restored, original CI guard unchanged; Reliability multi-filter reset remains atomic and limit-only reset uses existing setter; Insights prior R2 retained. Five original tests unchanged.",
+  "recovery_failed_commit": "ba7b70a4d4a718f4ce563df4737a971f5a966869",
+  "r2_ci_failure": {
+    "commit": "4836656ed819df19eee5223d9802f85ebed2618b",
+    "log": "logs_119861843499.zip",
+    "failed_check": "check:storage-location-deeplink-search",
+    "failure": "search URL updated",
+    "r3_local_result": "31/31 PASS on exact unchanged CI script"
+  }
 }

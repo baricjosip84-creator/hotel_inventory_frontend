@@ -375,12 +375,16 @@ export default function StorageLocationsPage() {
 
   const changeDirectorySearch = (value: string) => {
     setSearch(value);
-    setSearchParams((currentParams) => storageLocationDirectoryFilterParams(currentParams, value, zoneFilter), { replace: true });
+    if (requestedLocationId) {
+      setSearchParams(storageLocationDirectoryFilterParams(searchParams, value, zoneFilter), { replace: true });
+    }
   };
 
   const changeDirectoryZone = (value: string) => {
     setZoneFilter(value);
-    setSearchParams((currentParams) => storageLocationDirectoryFilterParams(currentParams, search, value), { replace: true });
+    if (requestedLocationId) {
+      setSearchParams(storageLocationDirectoryFilterParams(searchParams, search, value), { replace: true });
+    }
   };
 
   const clearFilters = () => {
@@ -388,7 +392,7 @@ export default function StorageLocationsPage() {
     setZoneFilter('');
     // Clear an exact linked location as well: otherwise the list stays pinned.
     if (requestedLocationId || searchParams.has('search') || searchParams.has('zone')) {
-      setSearchParams((currentParams) => storageLocationDirectoryShowAllParams(currentParams), { replace: true });
+      setSearchParams(storageLocationDirectoryShowAllParams(searchParams), { replace: true });
     }
   };
 
