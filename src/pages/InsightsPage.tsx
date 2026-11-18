@@ -1,6 +1,6 @@
 import { isUnusualOutboundTier } from '../lib/feedAnomalyDisplay';
 import { csvSpreadsheetCell } from '../lib/spreadsheetCsv';
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import type { CSSProperties } from 'react';
 import { Link, useSearchParams } from 'react-router';
 import { useQuery } from '@tanstack/react-query';
@@ -733,22 +733,45 @@ export default function InsightsPage() {
     return ui(labels[value]);
   };
   const [searchParams, setSearchParams] = useSearchParams();
-  const [lookbackDays, setLookbackDays] = useState(() => normalizeLookbackDays(searchParams.get('lookback_days')));
-  const [supplierRiskFilter, setSupplierRiskFilter] = useState<SupplierRiskFilter>(() => normalizeSupplierRiskFilter(searchParams.get('supplier_risk')));
-  const [supplierTierFilter, setSupplierTierFilter] = useState<SupplierTierFilter>(() => normalizeSupplierTierFilter(searchParams.get('supplier_tier')));
-  const [supplierSort, setSupplierSort] = useState<SupplierSort>(() => normalizeSupplierSort(searchParams.get('supplier_sort')));
-  const [supplierSearch, setSupplierSearch] = useState(() => searchParams.get('supplier_search') ?? '');
-  const [supplierPage, setSupplierPage] = useState(() => normalizeSupplierPage(searchParams.get('supplier_page')));
-  const [supplierPageSize, setSupplierPageSize] = useState<SupplierPageSize>(() => normalizeSupplierPageSize(searchParams.get('supplier_page_size')));
-  const [selectedSupplierId, setSelectedSupplierId] = useState<string | null>(() => searchParams.get('supplier_id'));
+  const lookbackDays = normalizeLookbackDays(searchParams.get('lookback_days'));
+  const supplierRiskFilter = normalizeSupplierRiskFilter(searchParams.get('supplier_risk'));
+  const supplierTierFilter = normalizeSupplierTierFilter(searchParams.get('supplier_tier'));
+  const supplierSort = normalizeSupplierSort(searchParams.get('supplier_sort'));
+  const supplierSearch = searchParams.get('supplier_search') ?? '';
+  const supplierPage = normalizeSupplierPage(searchParams.get('supplier_page'));
+  const supplierPageSize = normalizeSupplierPageSize(searchParams.get('supplier_page_size'));
+  const selectedSupplierId = searchParams.get('supplier_id');
+
+  // One navigation per action: no competing effects copying stale filters or details back into the URL.
+  const updateSupplierView = (changes: Record<string, string | null>, resetFilters = false) => {
+    const nextParams = new URLSearchParams(searchParams);
+    const defaults: Record<string, string> = {
+      lookback_days: '30', supplier_risk: 'all', supplier_tier: 'all',
+      supplier_sort: 'risk_flags_desc', supplier_page: '1', supplier_page_size: '6'
+    };
+    for (const [key, value] of Object.entries(changes)) {
+      if (value === null || value === '' || value === defaults[key]) nextParams.delete(key);
+      else nextParams.set(key, value);
+    }
+    if (resetFilters) {
+      nextParams.delete('supplier_page');
+      nextParams.delete('supplier_id');
+    }
+    if (nextParams.toString() !== searchParams.toString()) setSearchParams(nextParams, { replace: true });
+  };
+  const setLookbackDays = (value: number) => updateSupplierView({ lookback_days: String(value) });
+  const setSupplierRiskFilter = (value: SupplierRiskFilter) => updateSupplierView({ supplier_risk: value }, true);
+  const setSupplierTierFilter = (value: SupplierTierFilter) => updateSupplierView({ supplier_tier: value }, true);
+  const setSupplierSort = (value: SupplierSort) => updateSupplierView({ supplier_sort: value }, true);
+  const setSupplierSearch = (value: string) => updateSupplierView({ supplier_search: value }, true);
+  const setSupplierPageSize = (value: SupplierPageSize) => updateSupplierView({ supplier_page_size: String(value) }, true);
+  const setSupplierPage = (value: number | ((page: number) => number)) => updateSupplierView({ supplier_page: String(typeof value === 'function' ? value(supplierPage) : value) });
+  const setSelectedSupplierId = (value: string | null) => updateSupplierView({ supplier_id: value });
   const [showAllDepletionEvidence, setShowAllDepletionEvidence] = useState(false);
   const [depletionReviewPage, setDepletionReviewPage] = useState(0);
   const [selectedDepletionStockId, setSelectedDepletionStockId] = useState<string | null>(null);
   const [reorderReviewPage, setReorderReviewPage] = useState(0);
   const [selectedReorderProductId, setSelectedReorderProductId] = useState<string | null>(null);
-  const lastSyncedSearchParamsRef = useRef(searchParams.toString());
-  const hasMountedSupplierFilterResetRef = useRef(false);
-  const skipNextSupplierFilterResetRef = useRef(false);
 
   const canOpenDashboard = hasPermission(TENANT_PERMISSIONS.DASHBOARD_READ);
   const canOpenProducts = hasPermission(TENANT_PERMISSIONS.PRODUCTS_READ);
@@ -798,67 +821,6 @@ export default function InsightsPage() {
     queryFn: fetchSupplierTrustProductionReview
   });
 
-  useEffect(() => {
-    const currentSearchParams = searchParams.toString();
-
-    if (currentSearchParams !== lastSyncedSearchParamsRef.current) {
-      const nextLookbackDays = normalizeLookbackDays(searchParams.get('lookback_days'));
-      const nextSupplierSearch = searchParams.get('supplier_search') ?? '';
-      const nextSupplierRiskFilter = normalizeSupplierRiskFilter(searchParams.get('supplier_risk'));
-      const nextSupplierTierFilter = normalizeSupplierTierFilter(searchParams.get('supplier_tier'));
-      const nextSupplierSort = normalizeSupplierSort(searchParams.get('supplier_sort'));
-      const nextSupplierPage = normalizeSupplierPage(searchParams.get('supplier_page'));
-      const nextSupplierPageSize = normalizeSupplierPageSize(searchParams.get('supplier_page_size'));
-      const nextSelectedSupplierId = searchParams.get('supplier_id');
-
-      if (
-        nextSupplierSearch !== supplierSearch
-        || nextSupplierRiskFilter !== supplierRiskFilter
-        || nextSupplierTierFilter !== supplierTierFilter
-        || nextSupplierSort !== supplierSort
-        || nextSupplierPageSize !== supplierPageSize
-      ) {
-        skipNextSupplierFilterResetRef.current = true;
-      }
-
-      setLookbackDays(nextLookbackDays);
-      setSupplierSearch(nextSupplierSearch);
-      setSupplierRiskFilter(nextSupplierRiskFilter);
-      setSupplierTierFilter(nextSupplierTierFilter);
-      setSupplierSort(nextSupplierSort);
-      setSupplierPage(nextSupplierPage);
-      setSupplierPageSize(nextSupplierPageSize);
-      setSelectedSupplierId(nextSelectedSupplierId);
-      lastSyncedSearchParamsRef.current = currentSearchParams;
-      return;
-    }
-
-    const nextParams = new URLSearchParams(searchParams);
-
-    const setOrDelete = (key: string, value: string | null, defaultValue?: string) => {
-      const normalizedValue = value?.trim() ?? '';
-      if (!normalizedValue || normalizedValue === defaultValue) {
-        nextParams.delete(key);
-        return;
-      }
-
-      nextParams.set(key, normalizedValue);
-    };
-
-    setOrDelete('lookback_days', String(lookbackDays), '30');
-    setOrDelete('supplier_search', supplierSearch);
-    setOrDelete('supplier_risk', supplierRiskFilter, 'all');
-    setOrDelete('supplier_tier', supplierTierFilter, 'all');
-    setOrDelete('supplier_sort', supplierSort, 'risk_flags_desc');
-    setOrDelete('supplier_page', String(supplierPage), '1');
-    setOrDelete('supplier_page_size', String(supplierPageSize), '6');
-    setOrDelete('supplier_id', selectedSupplierId);
-
-    if (nextParams.toString() !== searchParams.toString()) {
-      lastSyncedSearchParamsRef.current = nextParams.toString();
-      setSearchParams(nextParams, { replace: true });
-    }
-  }, [lookbackDays, searchParams, selectedSupplierId, setSearchParams, supplierPage, supplierPageSize, supplierRiskFilter, supplierSearch, supplierSort, supplierTierFilter]);
 
 
   const activeReorderRows = useMemo(
@@ -1174,25 +1136,10 @@ export default function InsightsPage() {
   }, [locale, supplierTrustQuery.data?.rows, ui]);
 
   useEffect(() => {
-    if (!hasMountedSupplierFilterResetRef.current) {
-      hasMountedSupplierFilterResetRef.current = true;
-      return;
-    }
-
-    if (skipNextSupplierFilterResetRef.current) {
-      skipNextSupplierFilterResetRef.current = false;
-      return;
-    }
-
-    setSupplierPage(1);
-    setSelectedSupplierId(null);
-  }, [supplierRiskFilter, supplierSearch, supplierSort, supplierTierFilter, supplierPageSize]);
-
-  useEffect(() => {
-    if (supplierPage > supplierTotalPages) {
+    if (supplierTrustQuery.isSuccess && !supplierTrustQuery.isFetching && supplierPage > supplierTotalPages) {
       setSupplierPage(supplierTotalPages);
     }
-  }, [supplierPage, supplierTotalPages]);
+  }, [supplierPage, supplierTotalPages, supplierTrustQuery.isSuccess, supplierTrustQuery.isFetching]);
 
   const selectedSupplierTrustRow = useMemo(() => {
     if (!selectedSupplierId) {
@@ -1202,7 +1149,7 @@ export default function InsightsPage() {
     return supplierTrustQuery.data?.rows.find((row) => row.supplier_id === selectedSupplierId) ?? null;
   }, [selectedSupplierId, supplierTrustQuery.data?.rows]);
 
-  const supplierActiveFilterChips = useMemo(() => {
+  const supplierActiveFilterChips = (() => {
     const chips: Array<{ key: string; label: string; onClear: () => void }> = [];
 
     if (supplierSearch.trim()) {
@@ -1230,12 +1177,10 @@ export default function InsightsPage() {
     }
 
     return chips;
-  }, [formatReadableStatus, supplierRiskFilter, supplierSearch, supplierTierFilter, ui]);
+  })();
 
   function clearSupplierTrustFilters() {
-    setSupplierSearch('');
-    setSupplierRiskFilter('all');
-    setSupplierTierFilter('all');
+    updateSupplierView({ supplier_search: null, supplier_risk: 'all', supplier_tier: 'all' }, true);
   }
 
   function buildSupplierTrustViewUrl() {
@@ -1999,34 +1944,34 @@ export default function InsightsPage() {
               <div className="insights-breakdown-panel" style={styles.supplierBreakdownPanel} aria-label={ui("Supplier performance breakdown filters")}>
                 <div style={styles.itemTitle}>{ui("Supplier performance breakdown")}</div>
                 <div style={styles.supplierBreakdownGrid}>
-                  <button type="button" style={styles.breakdownButton} onClick={() => { setSupplierRiskFilter('with_risk'); setSupplierTierFilter('all'); }}>
+                  <button type="button" style={styles.breakdownButton} onClick={() => updateSupplierView({ supplier_risk: 'with_risk', supplier_tier: 'all' }, true)}>
                     {ui('Any risk · {count}').replace('{count}', formatNumber(supplierTrustBreakdown.withRisk, 0))}
                   </button>
-                  <button type="button" style={styles.breakdownButton} onClick={() => { setSupplierRiskFilter('high'); setSupplierTierFilter('all'); }}>
+                  <button type="button" style={styles.breakdownButton} onClick={() => updateSupplierView({ supplier_risk: 'high', supplier_tier: 'all' }, true)}>
                     {ui('High risk · {count}').replace('{count}', formatNumber(supplierTrustBreakdown.highRisk, 0))}
                   </button>
-                  <button type="button" style={styles.breakdownButton} onClick={() => { setSupplierRiskFilter('medium'); setSupplierTierFilter('all'); }}>
+                  <button type="button" style={styles.breakdownButton} onClick={() => updateSupplierView({ supplier_risk: 'medium', supplier_tier: 'all' }, true)}>
                     {ui('Medium risk · {count}').replace('{count}', formatNumber(supplierTrustBreakdown.mediumRisk, 0))}
                   </button>
-                  <button type="button" style={styles.breakdownButton} onClick={() => { setSupplierRiskFilter('low'); setSupplierTierFilter('all'); }}>
+                  <button type="button" style={styles.breakdownButton} onClick={() => updateSupplierView({ supplier_risk: 'low', supplier_tier: 'all' }, true)}>
                     {ui('Low risk · {count}').replace('{count}', formatNumber(supplierTrustBreakdown.lowRisk, 0))}
                   </button>
-                  <button type="button" style={styles.breakdownButton} onClick={() => { setSupplierRiskFilter('none'); setSupplierTierFilter('all'); }}>
+                  <button type="button" style={styles.breakdownButton} onClick={() => updateSupplierView({ supplier_risk: 'none', supplier_tier: 'all' }, true)}>
                     {ui('No risk · {count}').replace('{count}', formatNumber(supplierTrustBreakdown.noRisk, 0))}
                   </button>
-                  <button type="button" style={styles.breakdownButton} onClick={() => { setSupplierTierFilter('excellent'); setSupplierRiskFilter('all'); }}>
+                  <button type="button" style={styles.breakdownButton} onClick={() => updateSupplierView({ supplier_tier: 'excellent', supplier_risk: 'all' }, true)}>
                     {ui('Excellent · {count}').replace('{count}', formatNumber(supplierTrustBreakdown.excellent, 0))}
                   </button>
-                  <button type="button" style={styles.breakdownButton} onClick={() => { setSupplierTierFilter('strong'); setSupplierRiskFilter('all'); }}>
+                  <button type="button" style={styles.breakdownButton} onClick={() => updateSupplierView({ supplier_tier: 'strong', supplier_risk: 'all' }, true)}>
                     {ui('Strong · {count}').replace('{count}', formatNumber(supplierTrustBreakdown.strong, 0))}
                   </button>
-                  <button type="button" style={styles.breakdownButton} onClick={() => { setSupplierTierFilter('watch'); setSupplierRiskFilter('all'); }}>
+                  <button type="button" style={styles.breakdownButton} onClick={() => updateSupplierView({ supplier_tier: 'watch', supplier_risk: 'all' }, true)}>
                     {ui('Watch · {count}').replace('{count}', formatNumber(supplierTrustBreakdown.watch, 0))}
                   </button>
-                  <button type="button" style={styles.breakdownButton} onClick={() => { setSupplierTierFilter('risk'); setSupplierRiskFilter('all'); }}>
+                  <button type="button" style={styles.breakdownButton} onClick={() => updateSupplierView({ supplier_tier: 'risk', supplier_risk: 'all' }, true)}>
                     {ui('Risk tier · {count}').replace('{count}', formatNumber(supplierTrustBreakdown.risk, 0))}
                   </button>
-                  <button type="button" style={styles.breakdownButton} onClick={() => { setSupplierTierFilter('unrated'); setSupplierRiskFilter('all'); }}>
+                  <button type="button" style={styles.breakdownButton} onClick={() => updateSupplierView({ supplier_tier: 'unrated', supplier_risk: 'all' }, true)}>
                     {ui('Not enough history · {count}').replace('{count}', formatNumber(supplierTrustBreakdown.unrated, 0))}
                   </button>
                 </div>

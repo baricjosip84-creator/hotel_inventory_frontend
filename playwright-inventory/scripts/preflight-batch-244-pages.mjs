@@ -7,7 +7,7 @@ assert.equal(process.env.PW_BASE_URL,'https://hotel-inventory-frontend-mauve.ver
 assert.equal(process.env.PW_LIVE_ORIGINAL_READONLY,'YES');
 assert.equal(process.env.PW_ORIGINAL_SUITE_GROUP,'BULK_SAFE_17');
 const file='batch-244-live-access.json';
-if(process.argv.includes('--init')){fs.writeFileSync(file,JSON.stringify({status:'AUTH_NOT_VERIFIED',expectedCount:5,pages:p.pages,access:{},runnable:[],blocked:all},null,2));process.exit(0);}
+if(process.argv.includes('--init')){fs.writeFileSync(file,JSON.stringify({status:'AUTH_NOT_VERIFIED',expectedCount:3,pages:p.pages,access:{},runnable:[],blocked:all},null,2));process.exit(0);}
 assert(process.argv.includes('--apply'));
 const report=JSON.parse(fs.readFileSync(file,'utf8'));assert.equal(report.status,'PROBED');
 assert.deepEqual(sort(Object.keys(report.access)),sort(Object.keys(p.pages)));

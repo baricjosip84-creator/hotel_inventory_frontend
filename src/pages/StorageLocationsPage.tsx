@@ -144,13 +144,15 @@ export default function StorageLocationsPage() {
   const { locale, ui } = useAppTranslation();
   const queryClient = useQueryClient();
   const [searchParams, setSearchParams] = useSearchParams();
+  const directoryParams = new URLSearchParams(searchParams);
   const requestedLocationId = searchParams.get('location_id')?.trim() || '';
   const { canManageStorageLocations } = getRoleCapabilities();
   const canReadStock = hasPermission(TENANT_PERMISSIONS.STOCK_READ);
   const accessRoleLabel = getCurrentAccessRoleLabel();
 
-  const [search, setSearch] = useState(() => searchParams.get('search')?.trim() || '');
-  const [zoneFilter, setZoneFilter] = useState(() => searchParams.get('zone')?.trim() || '');
+  const search = directoryParams.get('search')?.trim() || '';
+  const zoneFilter = directoryParams.get('zone')?.trim() || '';
+  const [searchDraft, setSearchDraft] = useState(search);
   const [editingLocation, setEditingLocation] = useState<StorageLocationItem | null>(null);
   const [form, setForm] = useState<StorageLocationFormState>(emptyForm());
   const [customConditionSelected, setCustomConditionSelected] = useState(false);
@@ -279,19 +281,10 @@ export default function StorageLocationsPage() {
     };
   }, [canReadStock, locations]);
 
+  // The URL owns the directory filters. The input draft only retains spaces while typing.
   useEffect(() => {
-    const nextParams = new URLSearchParams(searchParams);
-
-    if (search.trim()) nextParams.set('search', search.trim());
-    else nextParams.delete('search');
-
-    if (zoneFilter.trim()) nextParams.set('zone', zoneFilter.trim());
-    else nextParams.delete('zone');
-
-    if (nextParams.toString() !== searchParams.toString()) {
-      setSearchParams(nextParams, { replace: true });
-    }
-  }, [search, searchParams, setSearchParams, zoneFilter]);
+    setSearchDraft((current) => current.trim() === search ? current : search);
+  }, [search]);
 
   const locationListUnavailable = locationsQuery.isLoading || locationsQuery.isError;
   const writeBusy = createMutation.isPending || updateMutation.isPending || retireMutation.isPending;
@@ -374,22 +367,16 @@ export default function StorageLocationsPage() {
   };
 
   const changeDirectorySearch = (value: string) => {
-    setSearch(value);
-    if (requestedLocationId) {
-      setSearchParams(storageLocationDirectoryFilterParams(searchParams, value, zoneFilter), { replace: true });
-    }
+    setSearchDraft(value);
+    setSearchParams(storageLocationDirectoryFilterParams(searchParams, value, zoneFilter), { replace: true });
   };
 
   const changeDirectoryZone = (value: string) => {
-    setZoneFilter(value);
-    if (requestedLocationId) {
-      setSearchParams(storageLocationDirectoryFilterParams(searchParams, search, value), { replace: true });
-    }
+    setSearchParams(storageLocationDirectoryFilterParams(searchParams, search, value), { replace: true });
   };
 
   const clearFilters = () => {
-    setSearch('');
-    setZoneFilter('');
+    setSearchDraft('');
     // Clear an exact linked location as well: otherwise the list stays pinned.
     if (requestedLocationId || searchParams.has('search') || searchParams.has('zone')) {
       setSearchParams(storageLocationDirectoryShowAllParams(searchParams), { replace: true });
@@ -619,7 +606,7 @@ export default function StorageLocationsPage() {
               id="storage-location-search"
               type="search"
               placeholder={ui("Name or storage condition")}
-              value={search}
+              value={searchDraft}
               onChange={(event) => changeDirectorySearch(event.target.value)}
               style={styles.searchInput}
               maxLength={255}

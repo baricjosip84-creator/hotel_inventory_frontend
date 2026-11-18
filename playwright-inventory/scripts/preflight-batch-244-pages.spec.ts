@@ -4,7 +4,6 @@ import {selectEnglishUI} from '../support/tenantSession';
 const origin='https://hotel-inventory-frontend-mauve.vercel.app';
 const targets:Record<string,{kind:'heading'|'text',marker:string}>={
  '/insights':{kind:'heading',marker:"Insights workspace"},
- '/reliability-command':{kind:'heading',marker:"Review current pressure, safety checks, and the manual follow-up path"},
  '/storage-locations':{kind:'heading',marker:"Storage location workspace"},
 };
 async function accessTarget(page:Page,route:string){
@@ -30,7 +29,7 @@ async function accessTarget(page:Page,route:string){
 }
 test('Batch 244 protected target access',async({page})=>{
  const file='batch-244-live-access.json',r=JSON.parse(fs.readFileSync(file,'utf8'));
- if(r.status!=='AUTH_NOT_VERIFIED'||r.expectedCount!==5||r.blocked.length!==5)throw Error('B244 access report not initialized');
+ if(r.status!=='AUTH_NOT_VERIFIED'||r.expectedCount!==3||r.blocked.length!==3)throw Error('B244 access report not initialized');
  test.setTimeout(600_000);const access:Record<string,string>={};
  for(const [area,mark] of Object.entries(r.pages as Record<string,{route:string}>)){
   try{await accessTarget(page,mark.route);access[area]='ACCESS_CONFIRMED';}

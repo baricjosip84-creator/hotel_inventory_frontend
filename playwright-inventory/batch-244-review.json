@@ -1,16 +1,14 @@
 {
   "batch": 244,
   "group": "BULK_SAFE_17",
-  "count": 5,
-  "confirmed_before": 2686,
-  "remaining_before": 252,
+  "count": 3,
+  "confirmed_before": 2688,
+  "remaining_before": 250,
   "prior_batch_user_confirmed_green": [
     "TSN-042"
   ],
   "selected": [
     "TINS-024",
-    "TRC-009",
-    "TRC-048",
     "TSL-040",
     "TSL-045"
   ],
@@ -18,10 +16,6 @@
     "insights": {
       "route": "/insights",
       "heading": "Insights workspace"
-    },
-    "reliability-command": {
-      "route": "/reliability-command",
-      "heading": "Review current pressure, safety checks, and the manual follow-up path"
     },
     "storage-locations": {
       "route": "/storage-locations",
@@ -35,13 +29,6 @@
       ],
       "sha256": "14dec95cf46e8971352758d8ece5527b579e98a357e55ce3e164005f5679daab"
     },
-    "tenant/reliability-command/reliability-command.spec.ts": {
-      "selected": [
-        "TRC-009",
-        "TRC-048"
-      ],
-      "sha256": "0a97676447f7954301eccce51b8c38b3d737edfde4dab5b67679449b398937ca"
-    },
     "tenant/storage-locations/storage-locations.spec.ts": {
       "selected": [
         "TSL-040",
@@ -53,7 +40,7 @@
   "source_files": {
     "src/pages/InsightsPage.tsx": {
       "before": "727bafd64516c3a7d7fe27673dee4e939d660d3ce558ece37f639740cec73401",
-      "after": "600715673272898671e911877c22f424e506c3d96d2138901c0c05d16eb4cc12",
+      "after": "1eab0b7aa14adcc8b9fff21f1b862022a85881847d2efee985c000ffe6ee2e2d",
       "bad_commit": "ba7b70a4d4a718f4ce563df4737a971f5a966869",
       "original_parent": "f6bc5ee860b00f394e2278bb7915616be516d19d",
       "bad_after": "8abdaadcd4818952160b1bd13575a068968616d87a6c13dc0a32626426b8a770"
@@ -67,13 +54,13 @@
     },
     "src/pages/StorageLocationsPage.tsx": {
       "before": "b2d96e4189d7b7635a335bd5b4a57167643e35791bf98c504f672f259d6ee122",
-      "after": "b2d96e4189d7b7635a335bd5b4a57167643e35791bf98c504f672f259d6ee122",
+      "after": "2fa053ffe6273306aa377937d21f22109aba9788b286294757847ab1b902bfaf",
       "bad_commit": "ba7b70a4d4a718f4ce563df4737a971f5a966869",
       "original_parent": "f6bc5ee860b00f394e2278bb7915616be516d19d",
       "bad_after": "4b89798ea7c61419b77ff7ae0e54cc1c1e7c8fdafcb45c2cebca7573d61bc325"
     }
   },
-  "basis": "R3: exact pre-B244 Storage Locations file restored, original CI guard unchanged; Reliability multi-filter reset remains atomic and limit-only reset uses existing setter; Insights prior R2 retained. Five original tests unchanged.",
+  "basis": "R4: exact recovered source with single-owner URL filters on Insights and Storage Locations. Two Reliability cases passed R3 and are excluded; three unchanged originals remain.",
   "recovery_failed_commit": "ba7b70a4d4a718f4ce563df4737a971f5a966869",
   "r2_ci_failure": {
     "commit": "4836656ed819df19eee5223d9802f85ebed2618b",
@@ -81,5 +68,18 @@
     "failed_check": "check:storage-location-deeplink-search",
     "failure": "search URL updated",
     "r3_local_result": "31/31 PASS on exact unchanged CI script"
+  },
+  "r3_live_result": {
+    "log": "logs_119867590953.zip",
+    "passed": [
+      "TRC-009",
+      "TRC-048"
+    ],
+    "failed": [
+      "TINS-024",
+      "TSL-040",
+      "TSL-045"
+    ],
+    "access": "All three pages confirmed"
   }
 }

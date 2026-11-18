@@ -197,7 +197,8 @@ jobs:
         if: ${{ inputs.group == 'BULK_SAFE_17' }}
         run: |
           node scripts/check-batch-244-source-diff.mjs
-      - name: Prepare Batch 244 (five original tests after source repairs)
+          node scripts/check-batch-244-url-actions.mjs
+      - name: Prepare Batch 244 R4 (three remaining original tests)
         if: ${{ inputs.group == 'BULK_SAFE_17' }}
         run: |
           node scripts/prepare-batch-237-runtime.mjs
@@ -292,7 +293,7 @@ jobs:
           PW_TENANT_PASSWORD: ${{ secrets.E2E_PASSWORD }}
           PLAYWRIGHT_JSON_OUTPUT_FILE: batch-244-results.json
         run: node scripts/run-batch-244.mjs
-      - name: Require all five Batch 244 actual pass results
+      - name: Require all three Batch 244 R4 actual pass results
         if: ${{ always() && inputs.group == 'BULK_SAFE_17' }}
         run: node scripts/check-batch-244-executed.mjs
       # No auth snapshots, traces, videos, screenshots, or artifacts uploaded.

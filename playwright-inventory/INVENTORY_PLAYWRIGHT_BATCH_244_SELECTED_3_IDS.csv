@@ -1,0 +1,4 @@
+test_id,spec_file,title,previous,next_stage,reason
+TINS-024,tenant/insights/insights.spec.ts,TINS-024 Changing supplier filter resets current page and clears old selected detail,FAILED_B244_R3,B244_R4_RECHECK,R3 live failed; R4 removes competing URL writes; original assertions unchanged.
+TSL-040,tenant/storage-locations/storage-locations.spec.ts,TSL-040 Search and zone updates preserve unrelated query parameters,FAILED_B244_R3,B244_R4_RECHECK,R3 live failed; R4 removes competing URL writes; original assertions unchanged.
+TSL-045,tenant/storage-locations/storage-locations.spec.ts,TSL-045 Changing condition on an exact deep link leaves pinned mode,FAILED_B244_R3,B244_R4_RECHECK,R3 live failed; R4 removes competing URL writes; original assertions unchanged.

@@ -1,19 +1,33 @@
-# Inventory Management App — Batch 244 R3
+# Inventory Management App — Batch 244 R4
 
-18 November 2026. Corrected release; supersedes initial Batch 244 source package.
+18 November 2026. Evidence: `logs_119867590953.zip` (R3 live run).
 
-- The frontend build validation stopped at `check:feed-anomaly-freshness`. The initial Batch 244 artifact replaced two pages with stale versions and lost previously implemented functionality. Exact pre-Batch-244 source was recovered from commit `f6bc5ee860b00f394e2278bb7915616be516d19d`, parent of `ba7b70a4d4a718f4ce563df4737a971f5a966869`.
-- Insights: preserve meaningful outbound anomaly tier filtering and current page source; clear the stale supplier detail on user filter changes while retaining URL restoration guards.
-- Storage Locations: restore the exact last working page from the pre-B244 commit, byte-for-byte. Its existing directory URL helper already removes the location pin, preserves unrelated URL parameters, and clears directory restrictions. R2's equivalent functional setter syntax was incompatible with the existing source-string regression guard; this is now corrected without altering the test.
-- Reliability Command: use the existing single-filter setter when the limit is the only query filter; otherwise clear all three query filters atomically in one URL update. This also retains compatibility with the earlier command-wide validation that checks the limit resets to 9.
-- Existing original-suite workflow and five selected original tests remain unchanged. The source guard now checks the actual original commit, failed commit, and corrected commit hashes.
-- Local validation: exact existing feed freshness/anomaly regression script 27/27 PASS; exact existing Storage Locations regression script 31/31 PASS; four real Reliability callback scenarios PASS. Differential audit of 19 archived source checks: 11 PASS and 8 unchanged baseline failures (other source/dependency differences), no new failures. Original scripts and original Playwright specs are unchanged. Full frontend CI/build and five live Playwright outcomes remain pending.
-- Confirmed counts remain 2,686/2,938 tenant (91.42%) and 2,686/9,900 overall (27.13%). No new PASS credited. Five originals remain pending: TINS-024, TRC-009, TRC-048, TSL-040, TSL-045.
+## Actual progress
 
-## GitHub UI only
+- R3: 2/5 original browser tests passed: TRC-009 and TRC-048. Reliability Command is unchanged in R4 and those passes are excluded from this run.
+- Three originals failed: TINS-024 (six supplier cards remained after filtering); TSL-040 and TSL-045 (exact location ID remained in the URL after directory filtering).
+- All three R3 pages had authenticated access. No further live passes are claimed yet.
+- Tenant: 2,688/2,938 passed (91.49%), 250 unresolved. Original total: 2,688/9,900 passed (27.15%), 7,212 remaining.
 
-1. Extract this changed-files ZIP into the frontend repository root, overwrite matching files, then commit/push using the normal process.
+## Changes
+
+- Insights: the URL now owns supplier search, filters, page, page size and selected detail. A filter action performs one navigation that also resets page and removes the selected supplier. Clear-all and breakdown actions update related filters together. Page clamping waits for successful, settled data. Shared links and unrelated parameters remain supported. Existing anomaly and other panels are preserved.
+- Storage Locations: the URL owns directory filters; the search input retains an uncommitted whitespace draft without writing back from an effect. Search and zone changes remove the exact location restriction and preserve unrelated URL parameters. Clear Filters removes the linked location, search and zone together.
+- No visual redesign, API change, backend change, Reliability page change or original test change.
+- Existing GitHub Actions workflow **Inventory - original 9900 Playwright suite**, existing **BULK_SAFE_17** selection. It now checks exactly the remaining 3 cases; a missing, blocked, skipped or failed case is not a pass.
+
+## Verified locally
+
+- Unmodified current frontend regression checks: feed freshness/anomaly 27/27, storage deep-link 31/31.
+- 41/41 assertions invoking actual changed frontend URL handlers (not live browser results).
+- Archived differential audit: 11 checks passed; eight unchanged pre-existing baseline failures (older guard/dependency mismatch), no new differences.
+- Original suite hashes/IDs checked; simulated workflow gate accepts 3/3 and rejects missing result (2/3). These are local gate tests, not evidence of actual live passes.
+- Full GitHub frontend validation, deployment and the three original live cases remain pending.
+
+## Next action — GitHub UI only
+
+1. Extract the changed-files ZIP into the frontend repository root, overwrite matching paths, commit and push.
 2. Wait for Frontend Validation and Vercel to turn green.
-3. Actions → **Inventory - original 9900 Playwright suite** → **Run workflow** → group **BULK_SAFE_17** → confirmation **ORIGINALTESTS** → **Run workflow**.
+3. GitHub → Actions → **Inventory - original 9900 Playwright suite** → **Run workflow** → group **BULK_SAFE_17** → confirmation **ORIGINALTESTS** → green **Run workflow** button.
 
-Expected: `B244 ACTUAL PASS 5/5`. Do not use the recovery workflow. No manual commands or new workflow required.
+Expected: `B244 ACTUAL PASS 3/3`. Send the resulting log ZIP. No terminal commands and no new workflow.
