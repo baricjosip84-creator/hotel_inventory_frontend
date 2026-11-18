@@ -1,0 +1,47 @@
+name: Inventory - Batch 244 recover exact source
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  recover:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    env:
+      CI: 'true'
+      VERCEL: '1'
+      VITE_API_BASE_URL: /api
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+      - name: Recover exact previous versions and apply three surgical fixes
+        run: node playwright-inventory/scripts/recover-batch-244-r2.mjs
+      - name: Install application dependencies
+        run: npm ci
+      - name: Verify anomaly and feed behavior (the previously failing check)
+        run: npm run check:feed-anomaly-freshness
+      - name: Verify TypeScript and production build
+        run: npm run build
+      - name: Package only verified changed files
+        run: |
+          cd "$RUNNER_TEMP/b244-r2-recovery/changed-files"
+          zip -q -r ../INVENTORY_PLAYWRIGHT_BATCH_244_R2_CHANGED_FILES_ONLY.zip .
+      - name: Download corrected changed-files ZIP
+        uses: actions/upload-artifact@v4
+        with:
+          name: B244-R2-VERIFIED-CHANGED-FILES
+          path: ${{ runner.temp }}/b244-r2-recovery/INVENTORY_PLAYWRIGHT_BATCH_244_R2_CHANGED_FILES_ONLY.zip
+          if-no-files-found: error
+      - name: Preserve exact prior source for diagnosis if recovery fails
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: B244-R2-ORIGINALS-FOR-DIAGNOSIS-DO-NOT-DEPLOY
+          path: ${{ runner.temp }}/b244-r2-recovery/originals/src/pages/*.tsx
+          if-no-files-found: ignore
